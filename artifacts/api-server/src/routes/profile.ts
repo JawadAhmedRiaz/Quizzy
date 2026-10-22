@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, profilesTable, attemptedQuestionsTable } from "@workspace/db";
+import { db, profilesTable, attemptedQuestionsTable, quizReportsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -43,6 +43,27 @@ router.post("/profile", async (req, res): Promise<void> => {
     if (notificationsEnabled !== undefined) updates.notificationsEnabled = notificationsEnabled;
 
     const [updated] = await db.update(profilesTable).set(updates).where(eq(profilesTable.userId, userId)).returning();
+
+    // If displayName was updated, sync past quiz reports from this session/guest/userId
+    if (displayName && typeof displayName === "string" && displayName.trim()) {
+      const newName = displayName.trim();
+      const oldName = existing[0]?.displayName?.trim();
+      try {
+        const targets = [userId];
+        if (oldName && oldName !== newName) targets.push(oldName);
+        if (isGuest || existing[0]?.isGuest) targets.push("Guest");
+
+        for (const target of targets) {
+          await db
+            .update(quizReportsTable)
+            .set({ userName: newName })
+            .where(eq(quizReportsTable.userName, target));
+        }
+      } catch (err) {
+        console.error("Failed to sync past quiz reports with new displayName:", err);
+      }
+    }
+
     res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
   }
 });

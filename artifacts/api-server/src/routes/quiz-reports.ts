@@ -144,12 +144,26 @@ router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
 
   for (const r of rows) {
     const clean = resolveName(r.userName, nameMap);
+    if (clean === "Guest" && rows.length > 1) continue; // Don't show generic Guest if named students exist
     if (aggregated.has(clean)) {
       aggregated.get(clean)!.attempts += Number(r.attempts);
     } else {
       aggregated.set(clean, { userName: clean, attempts: Number(r.attempts) });
     }
   }
+
+  // Also include registered student profiles that have a display name
+  try {
+    const allProfiles = await db.select().from(profilesTable);
+    for (const p of allProfiles) {
+      if (p.displayName && p.displayName.trim() && p.displayName.trim().toLowerCase() !== "guest") {
+        const name = p.displayName.trim();
+        if (!aggregated.has(name)) {
+          aggregated.set(name, { userName: name, attempts: 0 });
+        }
+      }
+    }
+  } catch {}
 
   res.json(Array.from(aggregated.values()));
 });

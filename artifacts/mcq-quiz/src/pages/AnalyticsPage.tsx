@@ -37,11 +37,15 @@ export function AnalyticsPage() {
   const [compare2, setCompare2] = useState("");
 
   const { data: usersRaw } = useGetQuizUsers({ query: { queryKey: getGetQuizUsersQueryKey() } });
-  const users = Array.isArray(usersRaw) ? usersRaw : [];
+  const rawUsers = Array.isArray(usersRaw) ? usersRaw : [];
+  const users = [...rawUsers];
+  if (myKey && !users.some((u) => u.userName.toLowerCase() === myKey.toLowerCase())) {
+    users.unshift({ userName: myKey, attempts: 0 });
+  }
 
   // Pre-fill compare1 with this user's key once loaded
   useEffect(() => {
-    if (myKey && !compare1) setCompare1(myKey);
+    if (myKey) setCompare1(myKey);
   }, [myKey]);
 
   // Girls vs Boys data

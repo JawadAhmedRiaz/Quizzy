@@ -16,22 +16,26 @@ export function ComparisonPage() {
   const { data: usersRaw, isLoading: usersLoading } = useGetQuizUsers({
     query: { queryKey: getGetQuizUsersQueryKey() },
   });
-  const users = Array.isArray(usersRaw) ? usersRaw : [];
+  const rawUsers = Array.isArray(usersRaw) ? usersRaw : [];
 
-  // Initialize Student 1 to logged in user if available, otherwise first user
+  // Always ensure the current student's displayName is in the list
+  const users = [...rawUsers];
+  if (displayName && !users.some((u) => u.userName.toLowerCase() === displayName.toLowerCase())) {
+    users.unshift({ userName: displayName, attempts: 0 });
+  }
+
+  // Initialize Student 1 to the current student's displayName
   useEffect(() => {
-    if (users.length > 0 && !compare1) {
-      if (displayName && users.some((u) => u.userName === displayName)) {
-        setCompare1(displayName);
-      } else {
-        setCompare1(users[0].userName);
-      }
+    if (displayName) {
+      setCompare1(displayName);
+    } else if (users.length > 0 && !compare1) {
+      setCompare1(users[0].userName);
     }
-  }, [users, displayName, compare1]);
+  }, [users, displayName]);
 
   // Set default student 2 to a different student
   useEffect(() => {
-    if (users.length > 1 && !compare2) {
+    if (users.length > 1 && (!compare2 || compare2 === compare1)) {
       const other = users.find((u) => u.userName !== compare1);
       if (other) {
         setCompare2(other.userName);
