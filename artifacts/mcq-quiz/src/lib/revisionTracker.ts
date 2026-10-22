@@ -151,7 +151,15 @@ export function clearAllMasteredMistakes() {
  * Synchronizes previous exam mistakes from PostgreSQL database quiz reports
  */
 export async function syncMistakesFromDatabase(userName?: string): Promise<MistakeRecord[]> {
-  if (typeof window === "undefined") return getAllMistakes();
+  if (
+    typeof window === "undefined" ||
+    !userName ||
+    !userName.trim() ||
+    userName.trim().toLowerCase() === "guest" ||
+    userName.trim().toLowerCase() === "guest scholar"
+  ) {
+    return getAllMistakes();
+  }
   try {
     const query = userName ? `?userName=${encodeURIComponent(userName)}` : "";
     const res = await fetch(`/api/quiz-reports/mistakes${query}`);

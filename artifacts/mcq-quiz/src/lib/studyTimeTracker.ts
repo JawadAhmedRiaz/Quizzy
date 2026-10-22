@@ -53,13 +53,6 @@ export function getStudyTimeMap(): DayData {
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     const map: DayData = raw ? JSON.parse(raw) : {};
-
-    // Restore yesterday's (Wednesday, Oct 21) study session time that was cleared during key migration
-    if (!map["2026-10-21"]) {
-      map["2026-10-21"] = 45; // Real learning & quiz time from Wednesday
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-    }
-
     return map;
   } catch {
     return {};

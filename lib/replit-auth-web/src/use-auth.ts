@@ -171,6 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("quizzy_guest_firstname");
       localStorage.removeItem("quizzy_guest_surname");
       localStorage.removeItem("quizzy_guest_gender");
+      localStorage.removeItem("quizzy_revision_mistakes_v1");
+      localStorage.removeItem("quizzy_real_study_time_by_day");
       sessionStorage.clear();
     } catch {}
 

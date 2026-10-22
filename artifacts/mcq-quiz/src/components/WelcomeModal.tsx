@@ -296,16 +296,6 @@ export function WelcomeModal({ show, onDismiss, onLogin, onContinueAsGuest }: Pr
             exit={{ scale: 0.92, opacity: 0, y: 16 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
           >
-            {/* Close button */}
-            <button
-              onClick={onDismiss}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-sm hover:opacity-70 transition-opacity"
-              style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-
             {/* ── WELCOME STEP ── */}
             {step === "welcome" && (
               <>

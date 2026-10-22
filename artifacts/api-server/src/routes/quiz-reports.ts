@@ -193,21 +193,23 @@ router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
 
 router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
+  if (!userName || !userName.trim() || userName.trim().toLowerCase() === "guest" || userName.trim().toLowerCase() === "guest scholar") {
+    res.json([]);
+    return;
+  }
   const nameMap = await getUserNameMap();
-  const targetResolved = userName ? resolveName(userName, nameMap) : null;
+  const targetResolved = resolveName(userName, nameMap);
   const allReports = await db.select().from(quizReportsTable).orderBy(desc(quizReportsTable.id));
 
-  const userReports = targetResolved
-    ? allReports.filter((r) => {
-        const rResolved = resolveName(r.userName, nameMap);
-        return (
-          r.userName === userName ||
-          rResolved === userName ||
-          r.userName === targetResolved ||
-          rResolved === targetResolved
-        );
-      })
-    : allReports;
+  const userReports = allReports.filter((r) => {
+    const rResolved = resolveName(r.userName, nameMap);
+    return (
+      r.userName === userName ||
+      rResolved === userName ||
+      r.userName === targetResolved ||
+      rResolved === targetResolved
+    );
+  });
 
   // Cache questionsTable to look up full question text, options, and explanations
   let allDbQuestions: any[] = [];
