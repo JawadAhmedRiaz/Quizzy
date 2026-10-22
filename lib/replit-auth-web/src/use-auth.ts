@@ -162,7 +162,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch {}
+
+    // Clear all guest session & dismissal flags so it asks to log in again
+    try {
+      localStorage.removeItem("quizzy_guest_continued");
+      localStorage.removeItem("welcomeDismissed");
+      localStorage.removeItem("quizzy_guest_id");
+      localStorage.removeItem("quizzy_guest_firstname");
+      localStorage.removeItem("quizzy_guest_surname");
+      localStorage.removeItem("quizzy_guest_gender");
+      sessionStorage.clear();
+    } catch {}
+
     setUser(null);
+    setIsAuthModalOpen(true);
     window.location.href = "/";
   }, []);
 
