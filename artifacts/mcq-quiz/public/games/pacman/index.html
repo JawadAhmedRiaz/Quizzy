@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Google PAC-MAN Arcade</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* CRITICAL: Google Pacman elements must use content-box */
+    #logo,
+    #logo *,
+    #pcm-c,
+    #pcm-c * {
+      box-sizing: content-box !important;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #090d16;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+
+    #scaler-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+      transition: transform 0.15s ease-out;
+    }
+
+    /* Cabinet frame snugly hugs the authentic 554x186 game screen */
+    .arcade-cabinet {
+      width: 554px;
+      height: 186px;
+      box-sizing: content-box !important;
+      background: #000;
+      border: 3px solid #facc15;
+      border-radius: 14px;
+      box-shadow: 
+        0 0 20px rgba(250, 204, 21, 0.3),
+        0 8px 24px rgba(0, 0, 0, 0.8),
+        inset 0 0 10px rgba(250, 204, 21, 0.15);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #logo {
+      width: 554px;
+      height: 186px;
+      background: black url(pacman10-hp.png) 0 0 no-repeat;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #logo-l {
+      width: 200px;
+      height: 2px;
+      left: 177px;
+      top: 157px;
+      background: #990;
+      position: absolute;
+      display: none;
+      overflow: hidden;
+    }
+
+    #logo-b {
+      position: absolute;
+      left: 0;
+      background: #ff0;
+      height: 8px;
+      width: 0;
+    }
+
+    .controls-bar {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .btn-coin {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #000;
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: transform 0.1s, filter 0.15s;
+    }
+    .btn-coin:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .btn-coin:active {
+      transform: translateY(1px);
+    }
+
+    .btn-sound {
+      background: rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      font-weight: 700;
+      font-size: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 9999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .btn-sound.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-color: rgba(34, 197, 94, 0.35);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+    }
+
+    .key-badge {
+      font-size: 10px;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Compact On-Screen D-Pad for Mobile / Mouse */
+    .dpad-container {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(3, 38px);
+      grid-template-rows: repeat(2, 30px);
+      gap: 4px;
+      justify-content: center;
+    }
+    .dpad-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      color: #facc15;
+      font-size: 13px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .dpad-btn:active {
+      background: rgba(250, 204, 21, 0.25);
+      transform: scale(0.95);
+    }
+    .dpad-up { grid-column: 2; grid-row: 1; }
+    .dpad-left { grid-column: 1; grid-row: 2; }
+    .dpad-down { grid-column: 2; grid-row: 2; }
+    .dpad-right { grid-column: 3; grid-row: 2; }
+  </style>
+
+  <script>
+    window.google = {
+      time: function () {
+        return (new Date).getTime()
+      },
+      Toolbelt: {},
+      y: {},
+      dstr: [],
+      rein: []
+    };
+
+    function sendKey(code) {
+      var evt = new KeyboardEvent('keydown', {
+        keyCode: code,
+        which: code,
+        bubbles: true,
+        cancelable: true
+      });
+      window.dispatchEvent(evt);
+    }
+
+    function insertCoin() {
+      if (window.google && google.pacman && google.pacman.insertCoin) {
+        google.pacman.insertCoin();
+      } else {
+        if (window.triggerPacmanLoad) {
+          window.triggerPacmanLoad(false);
+        }
+      }
+    }
+
+    var isSoundMuted = true; // MUTED BY DEFAULT
+
+    function toggleMute() {
+      isSoundMuted = !isSoundMuted;
+      var btn = document.getElementById("btn-sound");
+      
+      if (window.PacManAudioEngine && PacManAudioEngine.setMuted) {
+        PacManAudioEngine.setMuted(isSoundMuted);
+      }
+      if (window.google && google.pacman && google.pacman.game) {
+        if (isSoundMuted) {
+          google.pacman.game.userDisabledSound = true;
+          google.pacManSound = false;
+          google.pacman.game.stopAllAudio && google.pacman.game.stopAllAudio();
+        } else {
+          google.pacman.game.userDisabledSound = false;
+          google.pacManSound = true;
+          google.pacman.game.playAmbientSound && google.pacman.game.playAmbientSound();
+        }
+        google.pacman.game.updateSoundIcon && google.pacman.game.updateSoundIcon();
+      }
+
+      if (btn) {
+        if (isSoundMuted) {
+          btn.innerHTML = "<span>🔇</span> Sound: OFF";
+          btn.classList.remove("active");
+        } else {
+          btn.innerHTML = "<span>🔊</span> Sound: ON";
+          btn.classList.add("active");
+        }
+      }
+    }
+
+    function fitToScreen() {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      var targetW = 580;
+      var targetH = 300;
+      var scaleW = (w - 10) / targetW;
+      var scaleH = (h - 6) / targetH;
+      var scale = Math.min(1, Math.min(scaleW, scaleH));
+      if (scale < 0.45) scale = 0.45;
+
+      var container = document.getElementById("scaler-container");
+      if (container) {
+        if (scale < 0.99) {
+          container.style.transform = "scale(" + scale + ")";
+        } else {
+          container.style.transform = "scale(1)";
+        }
+      }
+    }
+
+    window.addEventListener("resize", fitToScreen);
+  </script>
+</head>
+<body>
+  <div id="scaler-container">
+    <div class="arcade-cabinet">
+      <div id="logo" title="Google PAC-MAN">
+        <div id="logo-l">
+          <div id="logo-b"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <button class="btn-coin" onclick="insertCoin()">
+        <span>🪙</span> INSERT COIN
+      </button>
+
+      <button id="btn-sound" class="btn-sound" onclick="toggleMute()" title="Toggle game sound">
+        <span>🔇</span> Sound: OFF
+      </button>
+
+      <div class="key-badge">
+        <span>🎮</span>
+        <strong style="color:#facc15">Arrows / WASD</strong>
+      </div>
+    </div>
+
+    <!-- Mobile D-pad -->
+    <div class="dpad-container">
+      <button class="dpad-btn dpad-up" onmousedown="sendKey(38)" ontouchstart="sendKey(38)">▲</button>
+      <button class="dpad-btn dpad-left" onmousedown="sendKey(37)" ontouchstart="sendKey(37)">◀</button>
+      <button class="dpad-btn dpad-down" onmousedown="sendKey(40)" ontouchstart="sendKey(40)">▼</button>
+      <button class="dpad-btn dpad-right" onmousedown="sendKey(39)" ontouchstart="sendKey(39)">▶</button>
+    </div>
+  </div>
+
+  <script src="google-script.js"></script>
+  <script>
+    google.neegg = 1;
+
+    google.pml = function () {
+      function d(a) {
+        if (!google.pml_installed) {
+          google.pml_installed = true;
+          if (!a) {
+            document.getElementById("logo").style.background = "black";
+            window.setTimeout(function () {
+              var b = document.getElementById("logo-l");
+              if (b) b.style.display = "block"
+            }, 400);
+          }
+          var audio = document.createElement("script");
+          audio.type = "text/javascript";
+          audio.src = "pacman-audio.js";
+          audio.onload = function () {
+            var s = document.createElement("script");
+            s.type = "text/javascript";
+            s.src = "pacman.js";
+            google.dom.append(s);
+          };
+          google.dom.append(audio);
+        }
+      }
+
+      window.triggerPacmanLoad = d;
+
+      if (!google.pml_loaded) {
+        google.pml_loaded = true;
+        window.setTimeout(function () {
+          d(true);
+        }, 200);
+        google.dstr && google.dstr.push(function () {
+          google.pacman && google.pacman.destroy();
+          if (google.pml_installed) {
+            google.pml_installed = false;
+          }
+        });
+        google.pacManQuery = function () {
+          return false;
+        };
+      }
+    };
+
+    google.pml && google.pml();
+    window.addEventListener("load", fitToScreen);
+  </script>
+</body>
+</html>

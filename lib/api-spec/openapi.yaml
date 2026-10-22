@@ -1,0 +1,556 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: leaderboard
+    description: Global leaderboard operations
+  - name: quiz-reports
+    description: Per-quiz reports, leaderboard, and analytics
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [leaderboard]
+      summary: Get full global leaderboard
+      responses:
+        "200":
+          description: Full leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /leaderboard/score:
+    post:
+      operationId: submitScore
+      tags: [leaderboard]
+      summary: Submit or update a score
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitScoreBody"
+      responses:
+        "200":
+          description: Score submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderboardEntry"
+        "400":
+          description: Invalid input
+
+  /quiz-reports:
+    post:
+      operationId: submitQuizReport
+      tags: [quiz-reports]
+      summary: Submit a quiz attempt report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitQuizReportBody"
+      responses:
+        "201":
+          description: Report saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizReport"
+        "400":
+          description: Invalid input
+
+  /quiz-reports/leaderboard:
+    get:
+      operationId: getQuizLeaderboard
+      tags: [quiz-reports]
+      summary: Get per-quiz leaderboard (best score per user)
+      parameters:
+        - name: quizId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quiz leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuizLeaderboardEntry"
+
+  /quiz-reports/analytics:
+    get:
+      operationId: getUserAnalytics
+      tags: [quiz-reports]
+      summary: Get analytics for a specific user
+      parameters:
+        - name: userName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAnalytics"
+
+  /quiz-reports/users:
+    get:
+      operationId: getQuizUsers
+      tags: [quiz-reports]
+      summary: Get list of all users who have attempted quizzes
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuizUserEntry"
+
+  /quiz-reports/compare:
+    get:
+      operationId: compareUsers
+      tags: [quiz-reports]
+      summary: Compare analytics for two users
+      parameters:
+        - name: user1
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: user2
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Analytics for both users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserAnalytics"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OIDC.
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect after login.
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to OIDC logout.
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        score:
+          type: integer
+        correct:
+          type: integer
+        total:
+          type: integer
+        pct:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - score
+        - correct
+        - total
+        - pct
+        - createdAt
+        - updatedAt
+
+    SubmitScoreBody:
+      type: object
+      properties:
+        name:
+          type: string
+        score:
+          type: integer
+        correct:
+          type: integer
+        total:
+          type: integer
+        pct:
+          type: integer
+      required:
+        - name
+        - score
+        - correct
+        - total
+        - pct
+
+    QuizReport:
+      type: object
+      required: [id, userName, quizId, sem, subject, examType, correct, total, pct, score, createdAt]
+      properties:
+        id:
+          type: integer
+        userName:
+          type: string
+        quizId:
+          type: string
+        sem:
+          type: integer
+        subject:
+          type: string
+        examType:
+          type: string
+        correct:
+          type: integer
+        total:
+          type: integer
+        pct:
+          type: integer
+        score:
+          type: integer
+        createdAt:
+          type: string
+
+    SubmitQuizReportBody:
+      type: object
+      required: [userName, quizId, sem, subject, examType, correct, total, pct, score, answersJson]
+      properties:
+        userName:
+          type: string
+        quizId:
+          type: string
+        sem:
+          type: integer
+        subject:
+          type: string
+        examType:
+          type: string
+        correct:
+          type: integer
+        total:
+          type: integer
+        pct:
+          type: integer
+        score:
+          type: integer
+        answersJson:
+          type: string
+
+    QuizLeaderboardEntry:
+      type: object
+      required: [userName, bestScore, bestPct, correct, total, attempts]
+      properties:
+        userName:
+          type: string
+        bestScore:
+          type: integer
+        bestPct:
+          type: integer
+        correct:
+          type: integer
+        total:
+          type: integer
+        attempts:
+          type: integer
+
+    SubjectStat:
+      type: object
+      required: [subject, avgPct, attempts]
+      properties:
+        subject:
+          type: string
+        avgPct:
+          type: number
+        attempts:
+          type: integer
+
+    SemStat:
+      type: object
+      required: [sem, avgPct, attempts]
+      properties:
+        sem:
+          type: integer
+        avgPct:
+          type: number
+        attempts:
+          type: integer
+
+    ExamTypeStat:
+      type: object
+      required: [examType, avgPct, attempts]
+      properties:
+        examType:
+          type: string
+        avgPct:
+          type: number
+        attempts:
+          type: integer
+
+    UserAnalytics:
+      type: object
+      required: [userName, totalAttempts, avgPct, bySubject, bySem, byExamType]
+      properties:
+        userName:
+          type: string
+        totalAttempts:
+          type: integer
+        avgPct:
+          type: number
+        bySubject:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubjectStat'
+        bySem:
+          type: array
+          items:
+            $ref: '#/components/schemas/SemStat'
+        byExamType:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamTypeStat'
+
+    QuizUserEntry:
+      type: object
+      required: [userName, attempts]
+      properties:
+        userName:
+          type: string
+        attempts:
+          type: integer
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

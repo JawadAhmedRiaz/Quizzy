@@ -1,0 +1,44 @@
+SYSTEM GOAL: 
+Build an enterprise-grade Learning Management System (LMS) Admin Portal for "Quizzy" using Next.js, Tailwind CSS, and PostgreSQL. The UI must be a high-density, beautifully structured dark mode utilizing 'slate' and 'zinc' color palettes. Ensure fluid responsiveness and professional padding/margins.
+
+PHASE 1: SECURITY & NAVIGATION (Role-Based Access Control)
+- Database: Assume the `Users` table has a `role` column (default: 'student', admin: 'admin').
+- Middleware: Create a Next.js middleware file that protects the `/admin/*` routes. If the user's role is not 'admin', redirect them to the home page or a 404 page.
+- UI Element: In the global User Profile Sidebar, render a conditionally visible "⚙️ Admin Dashboard" button that only appears if the logged-in user has the 'admin' role.
+
+PHASE 2: THE AI INGESTION ENGINE (/admin/import)
+- UI Dashboard: Create a smart drop-zone with 3 dropdowns: Semester (1-8), Subject, and Exam Phase (Midterm/Final). 
+- Inputs: Add a massive text area for "Raw MCQ Text Dump" and a secondary optional text area for "Custom AI Instructions".
+- Backend API (/api/admin/parse): Integrate the `@google/generative-ai` SDK. Pass the raw text and custom instructions to the Gemini 2.5 Flash model. Enforce a strict JSON array output matching the database schema: [Question, Option_A, Option_B, Option_C, Option_D, Correct_Answer, Briefing].
+- Pre-Commit Verification Report: When the API returns the JSON, hide the input boxes and render the parsed data as interactive Review Cards. The admin must be able to click into any card, fix typos, or change the correct answer dropdown.
+- Save Action: Include a "Commit to Database" button that batch-inserts the verified array directly into the PostgreSQL database, categorized perfectly by the dropdown tags.
+
+PHASE 3: GLOBAL MCQ EDITOR & BANK (/admin/mcq-bank)
+- UI: Build a paginated, searchable data grid containing all active questions across the platform.
+- Filters: Add fast-filtering dropdowns by Subject and Semester.
+- Inline Actions: Provide "Edit" and "Delete" triggers on every row. Clicking "Edit" must open a modal window to hot-fix the text, options, or correct answer of that specific question immediately in the live database.
+
+PHASE 4: GRANULAR AUDIT LOGS (/admin/audit)
+- UI: Create a searchable User Registry grid showing all registered users and their total quiz attempts.
+- Score Wipe Tool: Add a red "Wipe Attempt" button to delete glitched or cheated scores.
+- Drill-Down Analytics: Clicking a specific attempt opens a timeline view of that exam.
+- Visual Status Cards: Display every question from that attempt. Use a Green Border if the student got it right, and a Red Border if they got it wrong. If wrong, show their selected answer side-by-side with the correct answer and the briefing text.
+- Time Trailing: Display a small badge on each question card showing exactly how many seconds the student spent on that problem.
+
+PHASE 5: COMMUNITY MODERATION QUEUE (/admin/flags)
+- UI: Build a triage inbox connected to a `Flagged_Reports` database table.
+- Triaging Cards: Display the flagged question text, the user who flagged it, the error category (Typo/Wrong Logic/Bad Explanation), and their written comment.
+- Inline Resolution: Add three action buttons to each card:
+  1. "Fix Now" (opens the editor modal to correct the question).
+  2. "Dismiss" (deletes the flag without changing the question).
+  3. "Purge Question" (instantly deletes the broken question from the main database).
+
+PHASE 6: GLOBAL SYSTEM CONTROLS (/admin/settings)
+- UI: Build a configuration panel that updates a global `system_configs` database table.
+- Clocks & Timers (Numeric up/down inputs):
+  1. Global Quiz Timer Limit (Minutes).
+  2. Question Interval Countdown (Seconds).
+  3. Break/Intermission Window between sections (Seconds).
+- Content Toggles: Add toggles to lock/unlock specific Semesters (1-8).
+- Text Variables: Add input fields to dynamically overwrite the platform's Header Title, Slogan, and Footer Links.
+- Maintenance Mode: Add a master switch that, when active, shows a "System Undergoing Maintenance" overlay across the entire frontend for normal users.

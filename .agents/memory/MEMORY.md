@@ -1,0 +1,2 @@
+- [DB Quiz ID Format](db-quiz-id-format.md) — `db-{subjectId}-{examType.toLowerCase()}` links subject rows to quiz routes
+- [Admin Portal Architecture](admin-portal-arch.md) — 6-phase admin portal, dark slate palette, all routes under /api/admin/* guarded by adminMiddleware

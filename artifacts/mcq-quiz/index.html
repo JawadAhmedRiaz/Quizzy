@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Quizzy, Your Own LMS</title>
+    <meta name="description" content="Quizzy by Hamid Mukhtar — Your Personal Learning Management System for academic MCQ preparation, analytics, and global leaderboards." />
+    <meta property="og:title" content="Quizzy, Your Own LMS" />
+    <meta property="og:description" content="Your Personal Learning Management System for academic MCQ practice, live analytics, and globally synced leaderboards." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Quizzy, Your Own LMS" />
+    <meta name="twitter:description" content="Your Personal Learning Management System for exam-grade MCQ preparation." />
+    <link rel="icon" type="image/png" href="/logo-transparent.png" />
+    <link rel="apple-touch-icon" href="/logo-transparent.png" />
+    <meta name="theme-color" content="#FAF7F2" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+      body {
+        margin: 0;
+        background-color: #FAF7F2;
+        color: #1A1D23;
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+      }
+      .app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 40%, rgba(0, 122, 255, 0.08), #FAF7F2 70%);
+        z-index: 99999;
+      }
+      .app-splash-icon-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+      }
+      .app-splash-icon {
+        font-size: 56px;
+        filter: drop-shadow(0 10px 24px rgba(99, 102, 241, 0.4));
+        animation: floatPulse 2.4s ease-in-out infinite;
+      }
+      .app-splash-aura {
+        position: absolute;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(99, 102, 241, 0) 70%);
+        animation: pulseAura 2s ease-out infinite;
+      }
+      .app-splash-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        background: linear-gradient(135deg, #1E3A8A, #007AFF);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0 0 6px 0;
+      }
+      .app-splash-subtitle {
+        font-size: 13px;
+        color: #475569;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        margin: 0 0 28px 0;
+      }
+      .app-splash-bar-wrap {
+        width: 140px;
+        height: 4px;
+        background: rgba(0, 122, 255, 0.12);
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+      .app-splash-bar {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 50%;
+        background: linear-gradient(90deg, #1E3A8A, #007AFF);
+        border-radius: 999px;
+        animation: shimmerSlide 1.4s ease-in-out infinite;
+      }
+      @keyframes floatPulse {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-8px) scale(1.04); }
+      }
+      @keyframes pulseAura {
+        0% { transform: scale(0.8); opacity: 0.8; }
+        100% { transform: scale(1.6); opacity: 0; }
+      }
+      @keyframes shimmerSlide {
+        0% { left: -50%; }
+        100% { left: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="app-splash">
+        <div class="app-splash-icon-wrapper">
+          <div class="app-splash-aura"></div>
+          <div class="app-splash-icon">🎓</div>
+        </div>
+        <h1 class="app-splash-title">Quizzy</h1>
+        <p class="app-splash-subtitle">Your Own Learning Management System</p>
+        <div class="app-splash-bar-wrap">
+          <div class="app-splash-bar"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

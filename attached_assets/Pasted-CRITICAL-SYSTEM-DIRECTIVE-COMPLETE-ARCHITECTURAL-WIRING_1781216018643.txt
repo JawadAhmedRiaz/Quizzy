@@ -1,0 +1,30 @@
+CRITICAL SYSTEM DIRECTIVE: COMPLETE ARCHITECTURAL WIRING & FULL PHASE DEPLOYMENT
+
+The current Admin Portal is relying on hardcoded placeholders and scaffolding. The student-facing Main Portal is disconnected from the database. You must execute the following fixes and then fully implement Phases 3 through 6 with NO scaffolding.
+
+### TASK 1: MAIN PORTAL WIRING & "EDIT-ONLY" CONSTRAINTS
+The Main Portal must read from the database, and the Admin Portal must only edit existing structures to prevent layout breaks.
+1. Admin Settings (/admin/settings): Build an "Edit-Only" manager. Remove any ability to "Add" or "Delete" Subjects, Quiz Rules, or Difficulty Tiers. The UI must only provide inputs to UPDATE existing rows in the `subjects` and `system_configs` tables.
+2. Main Portal Dashboards: Locate the student Home Dashboard and Pre-Quiz component. Delete all hardcoded subject arrays, rules, and difficulty tiers. Refactor these components to dynamically fetch their data from the `subjects` and `system_configs` database tables.
+3. Database Querying: Ensure clicking "Start Quiz" fetches questions directly from the PostgreSQL `questions` table using dynamic subject matching, replacing any old JSON file logic.
+
+### TASK 2: FILE UPLOAD FOR AI INGESTION (/admin/import)
+Manual pasting is inefficient. Upgrade the AI import engine to support document parsing.
+1. Install dependencies: `npm install pdf-parse mammoth`.
+2. UI: Add a styled Drag-and-Drop zone above the raw text area supporting .pdf, .docx, and .txt files.
+3. API (/api/admin/extract-file): Create a POST route to accept FormData, extract raw text using the installed packages, and return it to the frontend.
+4. Auto-populate: Automatically fill the "Raw MCQ Text Dump" text area with the extracted text for admin review before sending it to the Gemini API.
+
+### TASK 3: UI CLEANUP (FLAGGED QUESTIONS)
+1. Remove "Flagged Questions" entirely from the student-facing `Maps` sidebar.
+2. Ensure the Flagged Questions page is securely located at `/admin/flags`.
+3. Add the "Flagged Questions" link exclusively to the secure Admin Dashboard sidebar.
+
+### TASK 4: EXECUTE PHASES 3 TO 6 IN DETAIL (NO SCAFFOLDING)
+You previously scaffolded these phases. You must now implement their full, functional logic as originally designed:
+- PHASE 3 (Global MCQ Editor): Implement the fully functional data grid at `/admin/mcq-bank`. The inline "Edit" modal must successfully execute SQL updates to alter live questions.
+- PHASE 4 (Audit Logs): Implement the drill-down analytics for student attempts, including the Green/Red visual status cards comparing the student's answer to the correct answer, and the time-spent tracking.
+- PHASE 5 (Flags Queue): Fully wire the `/admin/flags` queue. The "Fix Now", "Dismiss", and "Purge" buttons MUST execute real database mutations to resolve or delete the flagged items.
+- PHASE 6 (System Controls): Wire the settings panel so that updating the Timers, Header text, or Maintenance Mode instantly updates the `system_configs` table and changes the global state.
+
+DO NOT use dummy data. DO NOT leave buttons un-wired. Implement the full production logic for all remaining phases now.

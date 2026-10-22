@@ -1,0 +1,145 @@
+) which option create content auto
+​Ans: Table of content?
+​(2) Table of content mainly use for?
+​Ans: organizing heading doc
+​(3) Which option update existing table of cont.
+​Ans: Update table
+​(4) Endnote appear at?
+​Ans: Bottom of doc.
+​(5) which option display all footnotes in doc?
+​Ans: show notes.
+​(6) which group contain Insert footnote and Insert endnote
+​Ans: Footnotes
+​(7) Citations are used in?
+​Ans: academic writing.
+8 which option is used to add reference of book & citation.
+​Ans: Insert \ast citation.
+​9 which option manage Sources
+​Ans: manage Sources
+​10 Bibliography contain.
+​Ans: Lis of ref and source.
+​11 which option add tittle below Pics?
+​Ans: caption
+​12 Table of fig is Created from
+​Ans: Caption.
+​13 update table of figure
+​Ans: update table
+​14 Cross ref is use for.
+​Ans: Link to another Part of doc
+​15 which group contain caption and cross ref?
+​Ans: caption.
+​16 Index is used to
+​Ans: List import topics with page num.
+​17which option marks word for an index.
+​Ans: Mark entry.
+​18 which option create final index?
+​Ans: Insert index.
+​19 Table of authoritie is used for.
+​Ans: Legal docs.
+​20 which option legal citation.
+​Ans: Mark citation.
+​21 which oft group contain Mark citation, Table of authorities.
+​22 which option avoid Palgirism
+​Ans: citation
+​23 which option is use to set margins,
+​Ans: Orientation,  Margin$\checkmark$, Colours, Breaks
+​24.  which orientation plays page vairtkaly.
+​Ans: Landscape X, Potrait \checkmark
+​25 which option change Page size?
+​Ans: Size$\checkmark$,
+​26 which option divide text to vertical section?
+​Ans: coloumns$\checkmark$ Horizontal orientation
+​27 which option start text on a new page?
+​Ans: Page break$\checkmark$, Section break \ast
+​28  which option automatically splits long words?
+​Ans: Hyphenation$\checkmark$, Coloumn Break
+​29  Which group conclude Margins orientation and size?
+​Ans: Arrang, Paragraph, Page setup$\checkmark$, font.
+​30 which option control Para distance from margin
+​Ans: Spacing, indent$\checkmark$, Coloumns, Breaks.
+​31 Para Spacing control?
+​Ans: Space before and after Para$\checkmark$
+(32) A which group contain Watermak, page, page Border
+​Ans: Page Background$\checkmark$.
+​(33) A watermark is.
+​Ans: A bg text.
+​(34) which option adds decorative line around page
+​Ans: Page colam, T / border$\checkmark$, watermark.
+​(35) which option chang Page bg colour?
+​Ans: Page colour$\checkmark$, watermark.
+​(36) Fonts are used to
+​Ans: change writing style.
+​(37) Themes help doc look?
+​Ans: Professional.
+​(38) Design is an ex of.
+​Ans: Tab
+39 Which option helps connect Section inside doc?
+​Ans: cross ref$\checkmark$.
+​(40) Which feature is use for flowchart
+​Ans: shapes$\checkmark$, footer, Eq, Connect Design tab.
+​(41) The design tab is used for?
+​Ans: Calculations, Drawing graphs., Document formatting$\checkmark$, internet.
+​(42) Design option change overall look?
+​Ans: Ans: Theme.
+​(43) Themes include.
+​Ans: \ast Colors and Fonts$\checkmark$, Effects only, borders only, Images only.
+​(44) which option change document font combination.
+​Ans: Colors, fonts$\checkmark$, watermark.
+​(45) which option change colour Scheme of doc.
+​Ans: colours \checkmark
+46) which feature allow searching images from internet
+​Ans: Shapes, Online Pics$\checkmark$, wordArt, SmartArt
+​(47) which option insert Predesign diagrams.
+​Ans: shapes, charts., SmartArt$\checkmark$, Symbol.
+​(48) which tool is used to insert graph
+​Ans: Screenshot, chart$\checkmark$, shape, table
+​(49) which option capture open windows for insertion?
+​Ans: Screenshot$\checkmark$, Pics,
+​(50) which feature insert weblinks
+​Ans: Bookmark, Hyperlinks$\checkmark$, symbol, Connect
+​(51) which option mark a specific place.
+​Ans: Cross reference, Bookmark$\checkmark$, Header
+​(52) which feature refers readers to another Part of doc?
+​Ans: ss, cross ref$\checkmark$, Bookmark, equation
+​(53) which option adds review notes in a document?
+​Ans: Header, footer, Comments$\checkmark$, Object
+​(54) which section contain Header and footer?
+​Ans: Home tab, Reference., Insert \checkmark, Design
+​(55) What is the Purpose of Header?
+​Ans: Add text at top of Page.\checkmark
+​(56) Purpose of footer:
+​Ans: Add text at Bottom$\checkmark$
+​(57) which feature auto number Page.
+​Ans: Page num$\checkmark$, Date and time,
+​(58) which option insert date and time?
+​Ans: Date and Time$\checkmark$.
+​(59) which option create movable text area?
+​Ans: Text Box$\checkmark$
+​(60) which option insert artistic text styl?
+​Ans: word Art$\checkmark$, Drop Cap, Shapes, Object.
+​(61) which option enlarge first leter of Para?
+​Ans: Drop Cap$\checkmark$, WordArt, Symbol, SmartArt.
+​(62) which option insert extend files or object?
+​Ans: ss, object$\checkmark$, Table, Chart
+​(63) which inset. mathametical formulas
+​Ans: Symbol, Equation$\checkmark$, Bookmark
+​(64) which option insert special chracter?
+​Ans: shapes, symbol$\checkmark$.
+​(65) which group contain Pic, shape, chart
+​Ans: Links, Text, illustration$\checkmark$, Symbol.
+​(66) Which feature is use for decorative Page introduction?
+​Ans: Cover Page$\checkmark$, Footer, Hyperlinks, Symbol.
+​(67) which tab have eq option
+​Ans: insert
+68 which option is use to rotate object.
+​Ans: Rotate$\checkmark$, gray.
+​(69) which option send object back another object?
+​Ans: Bring send backward$\checkmark$.
+​(70) Section Pane is use to.
+​Ans: Many objects$\checkmark$.
+​(71) which option align object properly?
+​Ans: Align$\checkmark$.
+​(72 which option combine multiple object in on?
+​Ans: Group$\checkmark$.
+​(73) which feature number each line in doc?
+​Ans: line number$\checkmark$.

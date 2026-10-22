@@ -1,0 +1,196 @@
+Make only targeted, surgical changes as described below. Preserve all existing functionality.
+
+I have uploaded a favicon for this app/website.named as favicon.png.
+FAVICON UPDATE
+
+I have uploaded an image file called favicon.png (or app-icon.png — use whichever filename I uploaded) into the project root or public/ folder
+Replace the current favicon with this image
+In the <head> section of index.html (or the root HTML file), update the favicon link tag to point to this new file:
+<link rel="icon" type="image/png" href="/favicon.png">
+Also add these lines for better browser and mobile support:
+<link rel="apple-touch-icon" href="/favicon.png">
+<meta name="theme-color" content="#1a237e">
+If the project uses a framework like React/Vite/Next.js, place the favicon in the public/ folder and update the reference path accordingly
+Clear any cached favicon references in the existing code
+The favicon should appear on the browser tab immediately after reload
+
+1. GUEST NAME REQUIREMENT (Mandatory Before Proceeding)
+
+When a user clicks "Continue as Guest," immediately show a mandatory popup/modal before they can access anything
+The popup asks for: First Name and Surname (two separate fields)
+Both fields are required — the "Continue" button stays disabled until both are filled
+There is NO skip or close button — the user CANNOT dismiss this modal without entering their name
+Save the full name (First + Surname) to Database and under the guest's ID
+Use this name everywhere in the app for guest users: leaderboard, XP chart, analytics, comparison, profile page, flagged questions, badges — everywhere a name appears
+On the guest's profile page, pre-fill the name fields with what they entered
+For logged-in users: continue using the name they set in their profile settings (no change)
+Always Popup on homescreen of complete your profile if he hasn't completed whenever he visits app or opens homescreen.
+
+Also in profile options accessed from sidebar add a section to add gender, male or female. 
+
+2. LEADERBOARD — REAL NAMES & HIGHLIGHT CURRENT USER
+
+Display the real full name of every user on the leaderboard (guest name from database , profile name for logged-in users) — no user IDs, no "Guest_1234"
+Highlight the current user's row with a distinct background color (e.g., soft gold or blue tint) and a "👤 You" badge next to their name so they can instantly spot themselves
+When the current user clicks their own name/row, show a modal with:
+
+Their current rank, score %, XP, and accuracy
+A "Gap to #1" section showing:
+
+How many more XP points needed to reach rank #1
+How many more score points needed
+A motivational remark — e.g., "You're only 120 XP away from the top! Keep going 🔥" or "You're already #1 — defend your throne! 👑"
+
+
+Style this modal differently from when clicking other users' names.
+
+3. XP CHART & ANALYTICS — REAL NAMES & HIGHLIGHT SELF
+
+Replace any user ID or anonymous label on XP charts and analytics graphs with the user's real full name (same logic: guest name or profile name)
+On any chart (bar, radar, leaderboard chart) that includes the current user, highlight their bar/segment in a distinct accent color with His her name label
+Their position should be immediately visible without scrolling or searching
+
+4. HOMEPAGE — REMOVE "BY HAMID MUKHTAR" TEXT
+
+Find and remove the "By Hamid Mukhtar" text that is explicitly written/displayed on the main homepage
+Do NOT remove it from the footer — only from the main homepage hero/header section
+
+5. FOOTER — PROFESSIONAL REDESIGN
+
+Redesign the footer to look professional and clean
+Add a Contact section with the following:
+
+Label: "Contact / Feedback & Requests"
+Instagram button: link to the existing Instagram already in the app — but display it as just Instagram icon  do NOT display the full username string
+A short line: "For feedback, quiz requests, or bug reports — reach out on Instagram"
+
+Keep any existing footer links but organize them cleanly
+Footer should have consistent padding, subtle border-top, and muted color scheme — nothing flashy short footer not too big covering the page.
+also add with copyright symbol, copyright 2026 All rights reserved. Quizzy-LMS
+
+6. SIDEBAR — REORDER NAVIGATION CARD ABOVE BADGES CARD
+
+In the sidebar, find the "Navigate" tile/card and the "Badges" tile/card
+Move the Navigate card so it appears above the Badges card
+Do not change any other sidebar ordering or content
+
+7. FLAGGED QUESTIONS — GLOBAL SYNC & REPORTER DETAILS
+
+Flagged questions must be stored in the database (not locally) so they are globally visible to all users — guest and logged-in
+When any user flags a question, it immediately appears in the Flagged Questions section for everyone
+In the Flagged Questions page, each flagged question card must show:
+
+The question text and quiz it belongs to
+Total number of users who flagged it (e.g., "🚩 Flagged by 3 users")
+When clicked/expanded: show a list of which users reported it — display their real name (guest name or profile name), their reason, and timestamp
+If the same question is flagged by multiple users, group them under one entry (do not show duplicates)
+
+
+8. PENDING QUIZ NOTIFICATION BUBBLE ON HOMEPAGE SUBJECTS
+
+On the homepage, each subject card/tile must show a small notification bubble (red dot or number badge) if:
+
+The current user has not yet attempted any quiz under that subject, OR
+There is a new quiz uploaded under that subject that the user hasn't attempted yet
+
+
+The bubble should appear on the top-right corner of the subject card, similar to an app icon notification badge
+For guests: track attempted quizzes by guest ID stored in database
+For logged-in users: check their attempt history in the database
+If all quizzes under a subject are attempted, no bubble is shown for that subject
+The bubble number should reflect how many unattempted quizzes exist for that subject
+
+9. HOMEPAGE TITLE — CENTER ALIGNMENT
+
+On the homepage, find the main heading "Quizzy" and the subtitle "Your Own Learning Management System"
+These are currently aligned to one side of the page — move both to horizontally centered on the page
+Apply text-align: center and ensure the container is full width so it centers correctly
+Both lines should be centered together as a unit — title on top, subtitle directly below it
+Do not change font size, color, or styling — only fix the alignment
+
+A slightly little bigger in size main title On homepage to represent app name.
+
+
+10. SEMESTER DROPDOWN — LABEL & EMPTY STATE FIX
+
+Find the semester dropdown menu throughout the app (quiz filters, analytics, etc.)
+Fix the label format: Currently it displays as "Semester 1 (1st)" — change this to display as "1st Semester" only. Apply this renaming consistently for all semesters:
+
+Semester 1 change to  1st Semester
+Semester 2 → 2nd Semester
+Semester 3 → 3rd Semester
+Semester 4 → 4th Semester
+Semester 5 → 5th Semester
+Semester 6 → 6th Semester
+Semester 7 → 7th Semester
+Semester 8 → 8th Semester
+
+Fix the empty state in the dropdown: When a semester has no data, do NOT show "— No data available —" as a visible option inside the dropdown list. the empty state message when the user has selected a semester and views the page is fine to keep — just remove it from inside the dropdown options list.
+
+11. GENDER FIELD — PROFILE & GUEST ONBOARDING
+Profile Section (Sidebar):
+
+In the profile settings page, add a Gender field below the name fields
+Display as a clean toggle or radio button: Male / Female
+This field is saved to the user's profile in the database
+Gender is used across all analytics, comparisons, and charts
+
+Guest Name Popup (Mandatory Onboarding):
+
+Add Gender as a third mandatory field in the guest name popup (after First Name and Surname)
+Display as: two clearly styled buttons — 👦 Male and 👧 Female — user must select one
+The Continue button stays disabled until First Name, Surname, AND Gender are all filled
+Save gender to localStorage alongside guest name and sync to DataBase under guest ID. Also save to database too.
+Use gender in, Gender vs Gender comparison.
+
+
+12. GIRLS VS BOYS ANALYTICS COMPARISON
+Add a new tab/section inside the Analytics & Comparison page called "Girls vs Boys"
+Top Section — Winner Banner:
+
+At the very top, display a dominant slider/progress bar showing which gender is currently ahead overall
+The winning gender occupies MORE of the bar (proportional to their lead), the losing gender occupies LESS
+Above the bar show: 🏆 "Boys are currently leading" or "Girls are currently leading" — bold and prominent
+Below the bar show a remark: e.g., "Girls need 340 more avg XP to catch up" or "Boys are ahead by 12% avg score"
+Update this dynamically from live database data
+
+Side-by-Side Comparison Cards:
+Show the following metrics as side-by-side cards — Left = Girls 👧, Right = Boys 👦, with a VS divider in the center:
+
+📊 Average Score %
+⚡ Average XP
+🏅 Total Badges Earned (and avg per user)
+🎯 Average Accuracy %
+🔥 Average Streak (days)
+⏱ Average Time per Question
+📚 Most Attempted Subject
+💪 Strongest Subject (highest avg score in that subject)
+😓 Weakest Subject (lowest avg score)
+🏆 Number of #1 Leaderboard Finishes
+📝 Total Quizzes Attempted
+🚩 Questions Flagged
+
+For each card:
+
+The winning side is highlighted with a stronger color / bold border
+The losing side shows a subtle "needs +X to catch up" note underneath its value
+Use a colored bar under each metric showing the proportional gap visually
+
+Charts Section (below the cards):
+
+Bar chart: Average Score % — Girls vs Boys across all subjects
+Radar/Spider chart: Girls vs Boys across all metric categories (Score, XP, Accuracy, Streak, Speed)
+Line chart: Girls vs Boys average score trend over time (last 5 quizzes or by date)
+
+Individual Top Performers:
+
+Show: 👧 Top Girl — Name, Score %, XP, Rank
+Show: 👦 Top Boy — Name, Score %, XP, Rank
+Small profile card style, side by side
+
+Footer Remark Line:
+
+Dynamic sentence summarizing the competition: e.g., "Overall, Boys lead in XP and Accuracy while Girls lead in Streak consistency and Quiz attempts."
+Generate this by comparing which gender wins more metric categories
+
+

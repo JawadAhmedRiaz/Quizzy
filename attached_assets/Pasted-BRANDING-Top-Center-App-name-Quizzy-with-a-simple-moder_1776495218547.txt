@@ -1,0 +1,223 @@
+BRANDING (Top Center)
+
+App name: "Quizzy" with a simple modern icon (SVG or emoji-based)
+Below it: by Hamid Mukhtar (small text)
+Below that slogan: "Your All in One Platform for Preparation"
+Place this at the top-center of the main layout/header, visible on all screens
+
+2. TIMER SYSTEM
+
+Each question has a per-difficulty timer: Easy = 30s, Medium = 15s, Hard = 10s 
+Global quiz timer = sum of all per-question times
+Both timers count down simultaneously and are visible
+When global timer hits 0 → auto-submit whatever is answered
+Per-question timer resets on navigation to a new question but global timer never resets
+Display both timers clearly in the quiz UI
+
+3. NAVIGATION RULES
+Back Button:
+
+User can go back to view previous questions
+Answers on previous questions are LOCKED — cannot be changed
+Timer does NOT reset when going back
+
+Skip Button:
+
+Skipped question is removed from current position and appended to the END of the queue
+It reappears after all other unanswered questions
+Track skip count per question
+
+Break/Pause Button:
+
+Place a "Pause" button in the quiz toolbar, between the Skip and Back buttons
+Break options: 5 / 10 / 20 minutes (user selects)
+On break: ALL timers pause completely
+Show a full-screen modal: "Break Time 🕐" with a visible countdown of break duration
+A "Resume Early" button in the modal restores exact quiz state (question, timers, answers) with no resets
+When break countdown ends, auto-resume quiz
+
+5. PRACTICE MODE — NO REPEATED QUESTIONS
+
+Track which questions each user (by user ID or guest ID) has already attempted in a quiz
+When a user re-attempts a quiz for practice, exclude all previously attempted questions
+If only 50 of 100 questions were done before, the next practice session serves the remaining 50
+Store attempted question IDs in the user's profile/session data persistently
+Show a message: "You've already attempted X questions. Starting from remaining Y questions.If a user has attempted all questions then popup that you have attempted all, do you want to attempt again? and then yes or no. if yes then give all mcqs again.
+
+6. GUEST ACCESS + PROFILE SYSTEM
+Guest Access:
+
+All quiz features must be fully accessible to guest users (no login wall)
+On the login popup, add a "Continue as Guest" button alongside existing login options
+Generate a persistent guest ID (stored in local storage and database and show it in auth also) so guest data is saved across sessions on the same device
+Guest data is saved to the database under their guest ID (scores, attempts, analytics)
+Guests appear on leaderboard with their profile name
+
+Profile Completion Prompt:
+
+When any user (guest or logged in) visits the site and has an incomplete profile, show a dismissible popup: "Complete your profile to unlock full features → Go to Profile"
+This should only show once per session, not on every page load
+
+Profile Section (add to sidebar):
+
+Fields: Full Name, Roll Number (format: S26-XXXX), Department (dropdown: Cyber Security, Computer Science, Other), Section/Batch input
+Profile picture upload (optional)
+Save button
+Show profile completion % progress bar oncwe completed remove rpgress abr
+
+7. PUSH NOTIFICATIONS (New Quiz Alerts)
+
+Implement browser Push Notifications using the Web Push API (or a lightweight service like OneSignal free tier)
+When admin uploads a new quiz, send a push notification to ALL subscribed users AND guests
+Notification format: "📚 New Quiz Available: [Quiz Title] — Attempt it now!"
+Ask for notification permission on first visit (non-intrusive, after a 3 second delay)
+Store subscription tokens in the database per user/guest ID
+In user profile, show toggle: "Enable Quiz Notifications ✅
+
+8. LEADERBOARD IMPROVEMENTS
+
+Fix name display: Make sure full names are visible — truncate with ellipsis only if over 20 chars, show full name on hover tooltip
+Clickable profiles: Each leaderboard row is clickable — clicking opens a modal showing that user's full quiz analytics for that specific quiz:
+
+Score %, Accuracy, Time taken, Questions skipped, Rank, Question-by-question breakdown
+A "View Full Profile" link at bottom of modal
+
+
+Leaderboard scaling: Make the leaderboard, analytics, and comparison screens fully responsive. Use horizontal scroll or scaling on smaller screens so nothing is cut off. All columns must be visible.
+
+9. ANALYTICS SYSTEM (Full Implementation)
+Build analytics at three levels. Use charts (Chart.js or Recharts — whichever is already in the project).
+A. Quiz-wise Analytics
+
+Score %, Accuracy %, Total time taken vs allowed
+Questions: Attempted / Skipped / Correct / Incorrect
+Time per question (bar chart)
+Performance vs quiz average (comparison bar)
+
+B. Subject-wise Analytics
+
+Average score per subject (bar chart)
+Radar/spider chart: Strong vs weak subjects
+Attempt count per subject
+Improvement trend over last 5 attempts per subject (line chart)
+
+C. Semester-wise Analytics
+
+Aggregate scores grouped by semester tag on quiz
+Overall GPA-style performance indicator
+Attempt frequency per semester
+
+D. Behavioral Analytics
+
+Skip rate per quiz (%)
+Average time per question
+Break frequency and total break time
+Most-missed question types or topics (tag-based)
+
+E. Comparison Mode (Enhanced)
+
+Side-by-side comparison of 2 users (select from leaderboard or search)
+Compare ALL of: Score, Accuracy, Time taken, Skip rate, Attempts, Strongest subject, Weakest subject
+Display as: side-by-side bar chart AND radar chart simultaneously
+Not just percentages — show actual values with visual charts
+Available at: Quiz-level, Subject-level, Semester-level
+
+F. Public Profile Analytics
+
+On leaderboard, clicking a user's name shows their analytics modal for that quiz
+A dedicated public profile page at /profile/[userId] showing overall stats, quiz history, subject strengths, rank history
+Users can toggle which stats are public in their profile settings
+
+10. UI/LAYOUT FIXES
+
+Analytics, Leaderboard, and Comparison screens must scale properly on all screen sizes
+Use responsive CSS grid or flexbox — no fixed pixel widths that cause overflow
+Add horizontal scroll with visible scrollbar where tables are wide
+All text must be readable; increase font sizes on analytics cards if needed
+Charts must resize dynamically with the container
+
+IMPLEMENTATION NOTES FOR REPLIT AI:
+
+Do NOT rewrite the entire app — make surgical additions only
+Reuse existing database schema where possible; only ADD new fields/tables
+Reuse existing auth system; add guest flow on top of it
+If using React: add new components in separate files, import them where needed
+Keep all existing routes working
+Test that timer, navigation, and break system work together without conflicts
+Use existing styling system (CSS/Tailwind/whatever is already there) for consistency
+
+
+12. QUESTION FLAGGING SYSTEM
+Flagging in Quiz:
+
+Add a small 🚩 flag icon button on every question during a quiz (top-right of question card)
+Clicking opens a small dropdown with reasons: "Incorrect Answer", "Confusing Wording", "Duplicate Question", "Other (type reason)"
+User can type a short note (optional, max 200 chars)
+Flag is saved with: question ID, quiz ID, user ID (or guest ID), timestamp, reason, note
+After flagging, icon turns red — user can unflag by clicking again
+Flagging does NOT interrupt the quiz timer
+
+Flagged Questions Sidebar Page (visible to ALL users):
+
+Add "🚩 Flagged Questions" to the sidebar navigation — visible to everyone (guests and logged-in)
+Page shows a list of all flagged questions with:
+
+Question text
+Quiz name and subject it belongs to
+Flag reason
+Who flagged it: show display name (or "Guest" for guests)
+Timestamp of flag
+Number of times this question has been flagged (if multiple users flagged same question, group them)
+Expandable row to see all individual flags on that question
+
+
+Sort by: Most flagged first (default), Most recent, By subject
+Filter by: Subject, Reason type
+Admin sees additional controls: "Mark as Reviewed ✅", "Delete Question ❌", "Edit Question ✏️" buttons per row
+Non-admin users see read-only view — no edit/delete controls
+Show a banner at top: "Help us improve! Flag any question that seems wrong or confusing."
+11. GAMIFICATION SYSTEM (XP, Streaks, Badges)
+XP Points:
+
+Award XP after every quiz attempt based on: Score % × difficulty multiplier (Easy=1x, Medium=1.5x, Hard=2x)
+Bonus XP for: Perfect score (+50 XP), No skips (+20 XP), Fastest in leaderboard (+30 XP), Completed under half the time (+15 XP)
+Display XP on user profile, leaderboard row, and public analytics page
+Show XP gained at end of quiz result screen with animation: "+120 XP 🎉"
+Add an XP progress bar in the sidebar showing progress to next level
+Levels: Beginner (0–200), Scholar (201–500), Expert (501–1000), Master (1001–2000), Legend (2000+)
+Show level badge next to username everywhere it appears
+
+Streaks:
+
+A streak = attempting at least one quiz per calendar day
+Track streak count per user (guests included via localStorage + DB)
+Display streak on profile and sidebar: "🔥 7-day streak"
+If user misses a day, streak resets to 0
+Streak freeze: user earns 1 freeze token per 7-day streak — can be used to protect streak for 1 missed day
+Show a streak warning notification if user hasn't attempted a quiz today and it's after 6 PM
+
+Badges (award automatically, store in user profile):
+
+🏆 First Perfect Score — Score 100% on any quiz
+🔥 Week Warrior — 7-day streak
+⚡ Speed Demon — Complete a quiz in under 30% of allowed time
+🎯 Sharp Shooter — 90%+ accuracy on 5 quizzes in a row
+📚 Subject Master — Score 80%+ on all quizzes in a subject
+🌟 Top of the Class — Rank #1 on any leaderboard
+💪 Never Skip — Complete a full quiz with 0 skips
+🧠 Comeback Kid — Improve score by 30%+ on a re-attempt
+Show badges as icons on profile page with earned date and description tooltip
+Locked badges shown as grayed out with hint of how to earn them
+On earning a badge, show a celebratory full-screen flash modal for 2 seconds
+
+XP Leaderboard:
+ Also add XP leader board option in analytics and side bar and leaderboard of each quiz. when leaderboard page in open above theres also an option to open xp leader board.
+
+IMPLEMENTATION NOTES FOR SECTIONS 11 & 12:
+
+Add new DB tables: xp_log, badges, user_badges, streaks, question_flags
+XP and badge checks should run server-side after quiz submission, not client-side
+Flagging must work for guest users — use guest ID from localStorage
+Flagged Questions page requires no login to view
+All new UI elements must match existing app styling and color scheme
+Streak tracking must use server-side timestamps, not client clock, to prevent manipulation
