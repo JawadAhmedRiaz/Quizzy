@@ -80,6 +80,7 @@ function AppInner() {
   useRealStudyTracker();
   const [location] = useLocation();
   const { isAuthenticated, isLoading: authLoading, isAuthModalOpen, closeAuthModal } = useAuth();
+  const { refreshProfile } = useUser();
   const [splashVisible, setSplashVisible] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [guestContinued, setGuestContinued] = useState(() => !!localStorage.getItem("quizzy_guest_continued"));
@@ -125,6 +126,8 @@ function AppInner() {
         });
       } catch {}
     }
+    await refreshProfile();
+    window.dispatchEvent(new Event("quizzy_profile_updated"));
   }
 
   return (

@@ -134,22 +134,39 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [effectiveUserId]);
 
+  const [guestVersion, setGuestVersion] = useState(0);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setGuestVersion((v) => v + 1);
+      refreshProfile();
+    };
+    window.addEventListener("quizzy_profile_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("quizzy_profile_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, [refreshProfile]);
+
   useEffect(() => {
     if (effectiveUserId) {
       refreshProfile();
       refreshGamification();
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserId, guestVersion]);
 
   const authDisplayName = isAuthenticated && user
     ? ([user.firstName, user.lastName].filter(Boolean).join(" ").trim() || null)
     : null;
 
+  const currentGuestName = isGuest ? getGuestDisplayName() : null;
+
   const displayName =
     authDisplayName ||
-    profile?.displayName ||
-    (isGuest ? getGuestDisplayName() : null) ||
-    (isGuest ? "Guest" : "User");
+    (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null) ||
+    currentGuestName ||
+    (isGuest ? "Guest Scholar" : "User");
 
   const profileComplete = !!(
     profile?.displayName && profile?.rollNumber && profile?.department && profile?.section && profile?.gender

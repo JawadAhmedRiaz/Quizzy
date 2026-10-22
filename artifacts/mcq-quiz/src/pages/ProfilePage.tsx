@@ -93,6 +93,7 @@ export function ProfilePage() {
       gender: gender || null,
     } as any);
     await refreshProfile();
+    window.dispatchEvent(new Event("quizzy_profile_updated"));
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
