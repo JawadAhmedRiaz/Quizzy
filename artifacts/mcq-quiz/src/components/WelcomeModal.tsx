@@ -54,6 +54,10 @@ export function WelcomeModal({ show, onDismiss, onLogin, onContinueAsGuest }: Pr
   const [pendingEmail, setPendingEmail] = useState("");
   const [pendingFirstName, setPendingFirstName] = useState("");
 
+  // Guest validation state
+  const [guestError, setGuestError] = useState("");
+  const [guestLoading, setGuestLoading] = useState(false);
+
   useEffect(() => {
     if (!show || step !== "welcome") return;
 
@@ -141,8 +145,26 @@ export function WelcomeModal({ show, onDismiss, onLogin, onContinueAsGuest }: Pr
 
   const canContinue = firstName.trim().length > 0 && surname.trim().length > 0 && gender !== "";
 
-  function handleGuestSubmit() {
-    if (!canContinue) return;
+  async function handleGuestSubmit() {
+    if (!canContinue || guestLoading) return;
+    setGuestError("");
+    setGuestLoading(true);
+    const candidateName = `${firstName.trim()} ${surname.trim()}`;
+    const guestId = localStorage.getItem("quizzy_guest_id") || "guest_check";
+    try {
+      const res = await fetch(`${API}/profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: guestId, displayName: candidateName, gender, isGuest: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setGuestError(data.error || `The name "${candidateName}" is already taken by another student. Please choose a unique name.`);
+        setGuestLoading(false);
+        return;
+      }
+    } catch {}
+    setGuestLoading(false);
     onContinueAsGuest(firstName.trim(), surname.trim(), gender);
   }
 
@@ -797,19 +819,25 @@ export function WelcomeModal({ show, onDismiss, onLogin, onContinueAsGuest }: Pr
                   </div>
                 </div>
 
+                {guestError && (
+                  <p className="text-xs p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-semibold text-center">
+                    {guestError}
+                  </p>
+                )}
+
                 <button
                   onClick={handleGuestSubmit}
-                  disabled={!canContinue}
+                  disabled={!canContinue || guestLoading}
                   className="w-full py-3 rounded-xl font-bold text-sm transition-all"
                   style={{
-                    background: canContinue ? "linear-gradient(135deg, #3b82f6, #6366f1)" : "hsl(var(--muted))",
-                    color: canContinue ? "#fff" : "hsl(var(--muted-foreground))",
-                    opacity: canContinue ? 1 : 0.6,
-                    cursor: canContinue ? "pointer" : "not-allowed",
-                    boxShadow: canContinue ? "0 4px 20px rgba(59,130,246,0.35)" : "none",
+                    background: canContinue && !guestLoading ? "linear-gradient(135deg, #3b82f6, #6366f1)" : "hsl(var(--muted))",
+                    color: canContinue && !guestLoading ? "#fff" : "hsl(var(--muted-foreground))",
+                    opacity: canContinue && !guestLoading ? 1 : 0.6,
+                    cursor: canContinue && !guestLoading ? "pointer" : "not-allowed",
+                    boxShadow: canContinue && !guestLoading ? "0 4px 20px rgba(59,130,246,0.35)" : "none",
                   }}
                 >
-                  {canContinue ? "Continue →" : "Fill all fields to continue"}
+                  {guestLoading ? "Checking Name..." : canContinue ? "Continue →" : "Fill all fields to continue"}
                 </button>
 
                 <p className="text-xs text-center" style={{ color: "hsl(var(--muted-foreground))", opacity: 0.5 }}>

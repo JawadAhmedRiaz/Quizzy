@@ -6,51 +6,125 @@ import type { QuizReport } from "@workspace/db";
 
 const router: IRouter = Router();
 
-// Helper to map UUIDs and UserIDs to readable student usernames/display names
-async function getUserNameMap(): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  try {
-    const profiles = await db.select().from(profilesTable);
-    for (const p of profiles) {
-      if (p.displayName && p.displayName.trim()) {
-        map.set(p.userId, p.displayName.trim());
+// Helper to map and cluster all user identities dynamically
+async function getUserIdentities() {
+  const users = await db.select().from(usersTable).catch(() => []);
+  const profiles = await db.select().from(profilesTable).catch(() => []);
+
+  const nameMap = new Map<string, string>();
+  const identities: { canonicalName: string; aliases: Set<string> }[] = [];
+
+  const userById = new Map<string, typeof users[0]>();
+  for (const u of users) {
+    userById.set(u.id, u);
+  }
+
+  const profileByUserId = new Map<string, typeof profiles[0]>();
+  for (const p of profiles) {
+    profileByUserId.set(p.userId, p);
+    if (p.displayName && p.displayName.trim()) {
+      nameMap.set(p.userId, p.displayName.trim());
+    }
+  }
+
+  for (const u of users) {
+    const prof = profileByUserId.get(u.id);
+    const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
+    const canonicalName = prof?.displayName?.trim() || fullName || (u.email ? u.email.split("@")[0] : "Student");
+
+    const aliases = new Set<string>();
+    aliases.add(u.id.toLowerCase());
+    if (u.email) {
+      aliases.add(u.email.toLowerCase());
+      aliases.add(u.email.split("@")[0].toLowerCase());
+    }
+    if (fullName) {
+      aliases.add(fullName.toLowerCase());
+    }
+    if (prof?.displayName && prof.displayName.trim()) {
+      aliases.add(prof.displayName.trim().toLowerCase());
+    }
+    if (canonicalName) {
+      aliases.add(canonicalName.toLowerCase());
+    }
+
+    identities.push({
+      canonicalName,
+      aliases,
+    });
+
+    nameMap.set(u.id, canonicalName);
+    if (u.email) nameMap.set(u.email, canonicalName);
+    if (fullName) nameMap.set(fullName, canonicalName);
+  }
+
+  // Also handle profiles that might not have a usersTable row (e.g. guests who set their profile name)
+  for (const p of profiles) {
+    if (!userById.has(p.userId) && p.displayName && p.displayName.trim()) {
+      const canonicalName = p.displayName.trim();
+      const aliases = new Set<string>();
+      aliases.add(p.userId.toLowerCase());
+      aliases.add(canonicalName.toLowerCase());
+      identities.push({ canonicalName, aliases });
+      nameMap.set(p.userId, canonicalName);
+    }
+  }
+
+  function resolveToCanonical(rawName: string): string {
+    if (!rawName) return "Guest";
+    const trimmed = rawName.trim();
+    if (nameMap.has(trimmed)) return nameMap.get(trimmed)!;
+    const lower = trimmed.toLowerCase();
+    for (const ident of identities) {
+      if (ident.aliases.has(lower)) {
+        return ident.canonicalName;
       }
     }
-  } catch {}
+    if (trimmed.startsWith("guest_") || trimmed.startsWith("Guest Student")) {
+      return "Guest";
+    }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+      return "Guest";
+    }
+    return trimmed;
+  }
 
-  try {
-    const users = await db.select().from(usersTable);
-    for (const u of users) {
-      const full = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-      if (full) {
-        if (!map.has(u.id)) map.set(u.id, full);
-        if (u.email && !map.has(u.email)) map.set(u.email, full);
-      } else if (u.email) {
-        if (!map.has(u.id)) map.set(u.id, u.email.split("@")[0]);
+  function matchesUser(reportUserName: string, targetIdentifier: string): boolean {
+    if (!reportUserName || !targetIdentifier) return false;
+    const repLow = reportUserName.trim().toLowerCase();
+    const targLow = targetIdentifier.trim().toLowerCase();
+
+    // Exact direct match
+    if (repLow === targLow) return true;
+
+    // Find the identity cluster for targetIdentifier
+    const targetIdent = identities.find(i => i.aliases.has(targLow) || i.canonicalName.toLowerCase() === targLow);
+    if (targetIdent) {
+      if (targetIdent.aliases.has(repLow)) return true;
+      const resolvedRep = resolveToCanonical(reportUserName).toLowerCase();
+      if (targetIdent.aliases.has(resolvedRep) || targetIdent.canonicalName.toLowerCase() === resolvedRep) {
+        return true;
       }
     }
-  } catch {}
 
-  return map;
-}
+    // Also check if reportUserName itself maps to an identity that contains targetIdentifier
+    const reportIdent = identities.find(i => i.aliases.has(repLow) || i.canonicalName.toLowerCase() === repLow);
+    if (reportIdent) {
+      if (reportIdent.aliases.has(targLow) || reportIdent.canonicalName.toLowerCase() === targLow) {
+        return true;
+      }
+    }
 
-function resolveName(rawName: string, map: Map<string, string>): string {
-  if (!rawName) return "Guest";
-  if (map.has(rawName)) return map.get(rawName)!;
-  if (rawName.startsWith("guest_") || rawName.startsWith("Guest Student")) {
-    return "Guest";
+    return false;
   }
-  // If it's a raw UUID with dashes
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawName)) {
-    return "Guest";
-  }
-  return rawName;
+
+  return { identities, nameMap, resolveToCanonical, matchesUser };
 }
 
 // Clean any legacy UUIDs or "Guest Student (...)" strings in quizReportsTable
 async function cleanLegacyRecords() {
   try {
-    const nameMap = await getUserNameMap();
+    const { nameMap, resolveToCanonical } = await getUserIdentities();
     const allReports = await db.select().from(quizReportsTable);
     for (const r of allReports) {
       const isLegacy =
@@ -59,7 +133,7 @@ async function cleanLegacyRecords() {
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.userName);
 
       if (isLegacy || nameMap.has(r.userName)) {
-        const clean = resolveName(r.userName, nameMap);
+        const clean = resolveToCanonical(r.userName);
         if (clean !== r.userName) {
           await db
             .update(quizReportsTable)
@@ -78,9 +152,9 @@ router.post("/quiz-reports", async (req, res): Promise<void> => {
     return;
   }
 
-  // Resolve raw ID/guest strings to clean username
-  const nameMap = await getUserNameMap();
-  const cleanName = resolveName(parsed.data.userName, nameMap);
+  // Resolve raw ID/guest strings to clean canonical username
+  const { resolveToCanonical } = await getUserIdentities();
+  const cleanName = resolveToCanonical(parsed.data.userName);
 
   const [inserted] = await db
     .insert(quizReportsTable)
@@ -104,7 +178,7 @@ router.get("/quiz-reports/leaderboard", async (req, res): Promise<void> => {
     return;
   }
 
-  const nameMap = await getUserNameMap();
+  const { resolveToCanonical } = await getUserIdentities();
   const rows = await db
     .select({
       userName: quizReportsTable.userName,
@@ -121,7 +195,7 @@ router.get("/quiz-reports/leaderboard", async (req, res): Promise<void> => {
 
   res.json(
     rows.map((r) => ({
-      userName: resolveName(r.userName, nameMap),
+      userName: resolveToCanonical(r.userName),
       bestScore: r.bestScore ?? 0,
       bestPct: r.bestPct ?? 0,
       correct: r.correct ?? 0,
@@ -133,17 +207,17 @@ router.get("/quiz-reports/leaderboard", async (req, res): Promise<void> => {
 
 router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
   await cleanLegacyRecords();
+  const { resolveToCanonical } = await getUserIdentities();
   const rows = await db
     .select({ userName: quizReportsTable.userName, attempts: count() })
     .from(quizReportsTable)
     .groupBy(quizReportsTable.userName)
     .orderBy(quizReportsTable.userName);
 
-  const nameMap = await getUserNameMap();
   const aggregated = new Map<string, { userName: string; attempts: number }>();
 
   for (const r of rows) {
-    const clean = resolveName(r.userName, nameMap);
+    const clean = resolveToCanonical(r.userName);
     if (clean === "Guest" && rows.length > 1) continue; // Don't show generic Guest if named students exist
     if (aggregated.has(clean)) {
       aggregated.get(clean)!.attempts += Number(r.attempts);
@@ -168,50 +242,29 @@ router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
   res.json(Array.from(aggregated.values()));
 });
 
-function matchesUser(reportUser: string, queryUser: string, targetResolved: string, nameMap: Map<string, string>): boolean {
-  if (!reportUser || !queryUser) return false;
-  const r = reportUser.toLowerCase().trim();
-  const q = queryUser.toLowerCase().trim();
-  const t = (targetResolved || "").toLowerCase().trim();
-  const res = (resolveName(reportUser, nameMap) || "").toLowerCase().trim();
-
-  if (r === q || r === t || res === q || res === t) return true;
-
-  // Flexible match for common student aliases
-  if ((q.includes("jawad") || t.includes("jawad")) && (r.includes("jawad") || res.includes("jawad"))) {
-    return true;
-  }
-  if ((q.includes("hamid") || t.includes("hamid")) && (r.includes("hamid") || res.includes("hamid"))) {
-    return true;
-  }
-
-  return false;
-}
-
 router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
   if (!userName) {
     res.status(400).json({ error: "userName is required" });
     return;
   }
-  const nameMap = await getUserNameMap();
-  const targetResolved = resolveName(userName, nameMap);
+  const { resolveToCanonical, matchesUser } = await getUserIdentities();
+  const targetResolved = resolveToCanonical(userName);
   const allReports = await db.select().from(quizReportsTable);
 
-  const reports = allReports.filter((r) => matchesUser(r.userName, userName, targetResolved, nameMap));
+  const reports = allReports.filter((r) => matchesUser(r.userName, userName));
 
   res.json(buildAnalytics(targetResolved, reports));
 });
 
 router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
-  const nameMap = await getUserNameMap();
-  const targetResolved = userName ? resolveName(userName, nameMap) : "";
+  const { matchesUser } = await getUserIdentities();
   const allReports = await db.select().from(quizReportsTable).orderBy(quizReportsTable.createdAt);
 
   const reports = allReports.filter((r) => {
     if (!userName || !userName.trim()) return false;
-    return matchesUser(r.userName, userName, targetResolved, nameMap);
+    return matchesUser(r.userName, userName);
   });
 
   // Calculate actual daily study minutes from completed exams
@@ -232,11 +285,10 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
     res.json([]);
     return;
   }
-  const nameMap = await getUserNameMap();
-  const targetResolved = resolveName(userName, nameMap);
+  const { matchesUser } = await getUserIdentities();
   const allReports = await db.select().from(quizReportsTable).orderBy(desc(quizReportsTable.id));
 
-  const userReports = allReports.filter((r) => matchesUser(r.userName, userName, targetResolved, nameMap));
+  const userReports = allReports.filter((r) => matchesUser(r.userName, userName));
 
   // Cache questionsTable to look up full question text, options, and explanations
   let allDbQuestions: any[] = [];
@@ -317,34 +369,15 @@ router.get("/quiz-reports/compare", async (req, res): Promise<void> => {
     return;
   }
 
-  const nameMap = await getUserNameMap();
-  const target1 = resolveName(user1, nameMap);
-  const target2 = resolveName(user2, nameMap);
+  const { resolveToCanonical, matchesUser } = await getUserIdentities();
+  const target1 = resolveToCanonical(user1);
+  const target2 = resolveToCanonical(user2);
   const allReports = await db.select().from(quizReportsTable);
 
-  function matches(reportUser: string, queryUser: string, targetUser: string): boolean {
-    const repLow = (reportUser || "").toLowerCase().trim();
-    const qLow = (queryUser || "").toLowerCase().trim();
-    const tLow = (targetUser || "").toLowerCase().trim();
-    const res = (resolveName(reportUser, nameMap) || "").toLowerCase().trim();
+  const r1 = allReports.filter((r) => matchesUser(r.userName, user1));
+  const r2 = allReports.filter((r) => matchesUser(r.userName, user2));
 
-    if (repLow === qLow || repLow === tLow || res === qLow || res === tLow) return true;
-
-    // Support flexible matching for common user aliases
-    if ((qLow.includes("jawad") || tLow.includes("jawad")) && (repLow.includes("jawad") || res.includes("jawad"))) {
-      return true;
-    }
-    if ((qLow.includes("hamid") || tLow.includes("hamid")) && (repLow.includes("hamid") || res.includes("hamid"))) {
-      return true;
-    }
-
-    return false;
-  }
-
-  const r1 = allReports.filter((r) => matches(r.userName, user1, target1));
-  const r2 = allReports.filter((r) => matches(r.userName, user2, target2));
-
-  res.json([buildAnalytics(user1, r1), buildAnalytics(user2, r2)]);
+  res.json([buildAnalytics(target1, r1), buildAnalytics(target2, r2)]);
 });
 
 function buildAnalytics(userName: string, reports: QuizReport[]) {

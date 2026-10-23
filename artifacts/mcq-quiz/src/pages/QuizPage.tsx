@@ -622,20 +622,87 @@ export function QuizPage() {
             </div>
 
             <AnimatePresence>
-              {displayShowExpl && displayQ.e && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  className="rounded-xl p-3 text-xs leading-relaxed overflow-hidden"
-                  style={{ background: "rgba(59,130,246,0.08)", borderLeft: "3px solid #3b82f6", color: "hsl(var(--muted-foreground))" }}>
-                  💡 {displayQ.e}
+              {(displayShowExpl || displayAnswered || isReviewMode) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  className="rounded-2xl p-4 text-xs sm:text-sm leading-relaxed overflow-hidden border shadow-sm transition-all"
+                  style={{
+                    background:
+                      isReviewMode && reviewAnswer?.skipped
+                        ? "rgba(251,191,36,0.08)"
+                        : displaySelectedOpt === displayQ.a
+                        ? "rgba(16,185,129,0.08)"
+                        : "rgba(239,68,68,0.08)",
+                    borderColor:
+                      isReviewMode && reviewAnswer?.skipped
+                        ? "rgba(251,191,36,0.3)"
+                        : displaySelectedOpt === displayQ.a
+                        ? "rgba(16,185,129,0.35)"
+                        : "rgba(239,68,68,0.35)",
+                  }}
+                >
+                  {/* Status row */}
+                  <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-border/40">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">
+                        {isReviewMode && reviewAnswer?.skipped
+                          ? "⏭"
+                          : displaySelectedOpt === displayQ.a
+                          ? "✅"
+                          : "❌"}
+                      </span>
+                      <span
+                        className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+                        style={{
+                          background:
+                            isReviewMode && reviewAnswer?.skipped
+                              ? "rgba(251,191,36,0.2)"
+                              : displaySelectedOpt === displayQ.a
+                              ? "rgba(16,185,129,0.2)"
+                              : "rgba(239,68,68,0.2)",
+                          color:
+                            isReviewMode && reviewAnswer?.skipped
+                              ? "#fbbf24"
+                              : displaySelectedOpt === displayQ.a
+                              ? "#34d399"
+                              : "#f87171",
+                        }}
+                      >
+                        {isReviewMode && reviewAnswer?.skipped
+                          ? "Skipped Question"
+                          : displaySelectedOpt === displayQ.a
+                          ? "Correct Attempt!"
+                          : "Incorrect Attempt"}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                      <span>✓ Correct Option:</span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                        {LABELS[displayQ.a]}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Why it is correct feedback */}
+                  <div className="rounded-xl p-3 bg-muted/50 border border-border/70 text-foreground">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-blue-500 dark:text-blue-400 mb-1.5">
+                      <span>💡</span>
+                      <span>Why the correct answer is Option {LABELS[displayQ.a]} ({displayQ.o[displayQ.a]}):</span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground font-medium">
+                      {displayQ.e && displayQ.e.trim().length > 0
+                        ? displayQ.e
+                        : `"${displayQ.o[displayQ.a]}" is the correct answer according to the curriculum guidelines${
+                            displayQ.c ? ` for ${displayQ.c}` : ""
+                          }. Remember this rule for upcoming exam questions.`}
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {isReviewMode && reviewAnswer?.skipped && (
-              <p className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}>
-                ⏭ You skipped this question — answer is highlighted above
-              </p>
-            )}
           </motion.div>
         </AnimatePresence>
 

@@ -138,7 +138,7 @@ export function ComparisonPage() {
                 <option value="">— Select student —</option>
                 {users.map((u) => (
                   <option key={u.userName} value={u.userName}>
-                    {u.userName} ({u.attempts} {u.attempts === 1 ? "quiz" : "quizzes"})
+                    {u.userName}
                   </option>
                 ))}
               </select>
@@ -161,7 +161,7 @@ export function ComparisonPage() {
                   .filter((u) => u.userName.toLowerCase() !== compare1.toLowerCase())
                   .map((u) => (
                     <option key={u.userName} value={u.userName}>
-                      {u.userName} ({u.attempts} {u.attempts === 1 ? "quiz" : "quizzes"})
+                      {u.userName}
                     </option>
                   ))}
               </select>

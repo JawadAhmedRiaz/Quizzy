@@ -37,7 +37,7 @@ interface UserContextValue {
   gamification: GamificationData | null;
   refreshProfile: () => Promise<void>;
   refreshGamification: () => Promise<void>;
-  saveProfile: (data: Partial<UserProfile>) => Promise<void>;
+  saveProfile: (data: Partial<UserProfile>) => Promise<{ ok: boolean; error?: string }>;
   displayName: string;
   profileComplete: boolean;
 }
@@ -122,16 +122,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [effectiveUserId]);
 
-  const saveProfile = useCallback(async (data: Partial<UserProfile>) => {
-    if (!effectiveUserId) return;
+  const saveProfile = useCallback(async (data: Partial<UserProfile>): Promise<{ ok: boolean; error?: string }> => {
+    if (!effectiveUserId) return { ok: false, error: "No user session" };
     try {
       const r = await fetch(`${API}/profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: effectiveUserId, ...data }),
       });
-      if (r.ok) setProfile(await r.json());
-    } catch {}
+      if (r.ok) {
+        setProfile(await r.json());
+        return { ok: true };
+      } else {
+        const errJson = await r.json().catch(() => ({}));
+        return { ok: false, error: errJson.error || "Failed to save profile" };
+      }
+    } catch (e: any) {
+      return { ok: false, error: e?.message || "Failed to save profile" };
+    }
   }, [effectiveUserId]);
 
   const [guestVersion, setGuestVersion] = useState(0);

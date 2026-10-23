@@ -1,7 +1,7 @@
 import { eq, and, gt } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { GetCurrentAuthUserResponse } from "@workspace/api-zod";
-import { db, usersTable, emailVerificationsTable } from "@workspace/db";
+import { db, usersTable, emailVerificationsTable, profilesTable } from "@workspace/db";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import {
@@ -148,6 +148,23 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     return;
   }
 
+  // Enforce unique full name across existing profiles
+  const fullName = `${String(firstName).trim()} ${String(lastName).trim()}`.trim();
+  try {
+    const allProfiles = await db.select().from(profilesTable);
+    const profileConflict = allProfiles.some(
+      (p) => p.displayName && p.displayName.trim().toLowerCase() === fullName.toLowerCase()
+    );
+    if (profileConflict) {
+      res.status(409).json({
+        error: `The name "${fullName}" is already in use by another student. Please use a unique display name or add an initial.`,
+      });
+      return;
+    }
+  } catch (err) {
+    console.error("Error checking unique name in register:", err);
+  }
+
   const passwordHash = await hashPassword(password);
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -235,6 +252,19 @@ router.post("/auth/verify-email", async (req: Request, res: Response) => {
       })
       .returning();
     user = created;
+
+    // Immediately create student profile with their unique display name
+    const initialDisplayName = `${userData.firstName} ${userData.lastName}`.trim();
+    try {
+      await db
+        .insert(profilesTable)
+        .values({
+          userId: user.id,
+          displayName: initialDisplayName,
+          isGuest: false,
+        })
+        .onConflictDoNothing();
+    } catch {}
   }
 
   // Clean up verification record

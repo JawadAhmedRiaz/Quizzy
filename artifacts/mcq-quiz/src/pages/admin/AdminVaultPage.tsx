@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
+import { Maximize2, Minimize2, ExternalLink } from "lucide-react";
 
 const API = import.meta.env.BASE_URL + "api";
 
@@ -60,6 +61,21 @@ export function AdminVaultPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [previewDoc, setPreviewDoc] = useState<VaultDoc | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else if (previewDoc) {
+          setPreviewDoc(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, previewDoc]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Add Semester Modal
@@ -1023,17 +1039,53 @@ export function AdminVaultPage() {
 
         {/* ─── PREVIEW MODAL ─── */}
         {previewDoc && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="w-full max-w-3xl max-h-[90vh] rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl flex flex-col">
+          <div className={`fixed inset-0 z-50 flex items-center justify-center ${isFullscreen ? "p-0" : "p-4"} bg-black/80 backdrop-blur-sm`}>
+            <div className={
+              isFullscreen
+                ? "w-screen h-screen max-w-none max-h-none rounded-none bg-slate-900 border-none p-4 md:p-6 shadow-2xl flex flex-col"
+                : "w-full max-w-3xl max-h-[90vh] rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl flex flex-col"
+            }>
               <div className="flex items-start justify-between pb-3 border-b border-slate-800">
                 <div className="min-w-0 pr-4">
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
-                    {previewDoc.category}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                      {previewDoc.category}
+                    </span>
+                    {isFullscreen && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        Fullscreen Mode
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-base font-bold text-white mt-1 truncate">{previewDoc.title}</h3>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border shadow flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isFullscreen
+                        ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                    }`}
+                    title={isFullscreen ? "Exit Fullscreen (Esc)" : "Expand to Fullscreen"}
+                  >
+                    {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
+                  </button>
+
+                  <a
+                    href={previewDoc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow flex items-center gap-1.5 transition-all"
+                    title="Open in new window"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">New Tab</span>
+                  </a>
+
                   <a
                     href={previewDoc.fileUrl}
                     download={previewDoc.fileName}
@@ -1043,26 +1095,32 @@ export function AdminVaultPage() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setPreviewDoc(null)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
+                    onClick={() => {
+                      setPreviewDoc(null);
+                      setIsFullscreen(false);
+                    }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold cursor-pointer"
+                    title="Close (Esc)"
                   >
                     ✕
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 my-4 overflow-y-auto max-h-[60vh] rounded-xl bg-slate-950 p-4 flex flex-col items-center justify-center">
+              <div className={`flex-1 my-3 overflow-hidden rounded-xl bg-slate-950 flex flex-col items-center justify-center ${
+                isFullscreen ? "h-[calc(100vh-140px)] max-h-none p-2" : "max-h-[60vh] p-4 overflow-y-auto"
+              }`}>
                 {previewDoc.fileUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") ? (
                   <img
                     src={previewDoc.fileUrl}
                     alt={previewDoc.title}
-                    className="max-h-[50vh] w-auto object-contain rounded-lg shadow"
+                    className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-lg shadow`}
                   />
                 ) : previewDoc.fileUrl.startsWith("data:application/pdf") || previewDoc.fileName.endsWith(".pdf") ? (
                   <iframe
                     src={previewDoc.fileUrl}
                     title={previewDoc.title}
-                    className="w-full h-[50vh] rounded-lg border border-slate-800"
+                    className={`w-full rounded-lg border border-slate-800 ${isFullscreen ? "h-full" : "h-[50vh]"}`}
                   />
                 ) : (
                   <div className="text-center p-8">
@@ -1079,7 +1137,7 @@ export function AdminVaultPage() {
                 )}
               </div>
 
-              {previewDoc.description && (
+              {previewDoc.description && !isFullscreen && (
                 <div className="p-3 rounded-xl bg-slate-800/80 text-xs text-slate-300 border border-slate-700/60">
                   <strong className="text-white block mb-0.5">Notes:</strong>
                   {previewDoc.description}

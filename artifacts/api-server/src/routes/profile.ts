@@ -19,72 +19,104 @@ router.post("/profile", async (req, res): Promise<void> => {
   const { userId, displayName, rollNumber, department, section, gender, isGuest, notificationsEnabled } = req.body;
   if (!userId) { res.status(400).json({ error: "userId required" }); return; }
 
+  // Enforce unique display name (case-insensitive) across all profiles
+  if (displayName && typeof displayName === "string" && displayName.trim()) {
+    const trimmed = displayName.trim();
+    if (trimmed.toLowerCase() !== "guest") {
+      try {
+        const allProfiles = await db.select().from(profilesTable);
+        const conflict = allProfiles.find(
+          (p) => p.userId !== userId && p.displayName && p.displayName.trim().toLowerCase() === trimmed.toLowerCase()
+        );
+        if (conflict) {
+          res.status(409).json({
+            error: `The name "${trimmed}" is already taken by another student. Please choose a unique name.`,
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking unique display name:", err);
+      }
+    }
+  }
+
   const existing = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
   const today = new Date().toISOString().split("T")[0];
 
-  if (existing.length === 0) {
-    const [created] = await db.insert(profilesTable).values({
-      userId,
-      displayName: displayName ?? null,
-      rollNumber: rollNumber ?? null,
-      department: department ?? null,
-      section: section ?? null,
-      gender: gender ?? null,
-      isGuest: isGuest ?? false,
-      notificationsEnabled: notificationsEnabled ?? false,
-    }).returning();
-    res.status(201).json({ ...created, createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() });
-  } else {
-    const updates: Partial<typeof profilesTable.$inferInsert> = {};
-    if (displayName !== undefined) updates.displayName = displayName;
-    if (rollNumber !== undefined) updates.rollNumber = rollNumber;
-    if (department !== undefined) updates.department = department;
-    if (section !== undefined) updates.section = section;
-    if (gender !== undefined) updates.gender = gender;
-    if (notificationsEnabled !== undefined) updates.notificationsEnabled = notificationsEnabled;
+  try {
+    if (existing.length === 0) {
+      const [created] = await db.insert(profilesTable).values({
+        userId,
+        displayName: displayName ?? null,
+        rollNumber: rollNumber ?? null,
+        department: department ?? null,
+        section: section ?? null,
+        gender: gender ?? null,
+        isGuest: isGuest ?? false,
+        notificationsEnabled: notificationsEnabled ?? false,
+      }).returning();
+      res.status(201).json({ ...created, createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() });
+    } else {
+      const updates: Partial<typeof profilesTable.$inferInsert> = {};
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (rollNumber !== undefined) updates.rollNumber = rollNumber;
+      if (department !== undefined) updates.department = department;
+      if (section !== undefined) updates.section = section;
+      if (gender !== undefined) updates.gender = gender;
+      if (notificationsEnabled !== undefined) updates.notificationsEnabled = notificationsEnabled;
 
-    const [updated] = await db.update(profilesTable).set(updates).where(eq(profilesTable.userId, userId)).returning();
+      const [updated] = await db.update(profilesTable).set(updates).where(eq(profilesTable.userId, userId)).returning();
 
-    // If displayName was updated, sync past quiz reports from this session/guest/userId
-    if (displayName && typeof displayName === "string" && displayName.trim()) {
-      const newName = displayName.trim();
-      const oldName = existing[0]?.displayName?.trim();
-      try {
-        const targets = [userId];
-        if (oldName && oldName !== newName) targets.push(oldName);
-        if (isGuest || existing[0]?.isGuest) targets.push("Guest");
+      // If displayName was updated, sync past quiz reports from this session/guest/userId
+      if (displayName && typeof displayName === "string" && displayName.trim()) {
+        const newName = displayName.trim();
+        const oldName = existing[0]?.displayName?.trim();
+        try {
+          const targets = [userId];
+          if (oldName && oldName !== newName) targets.push(oldName);
+          if (isGuest || existing[0]?.isGuest) targets.push("Guest");
 
-        for (const target of targets) {
-          await db
-            .update(quizReportsTable)
-            .set({ userName: newName })
-            .where(eq(quizReportsTable.userName, target));
-        }
-
-        // Also update usersTable and current session if this is an authenticated user
-        const parts = newName.split(" ");
-        const first = parts[0] || newName;
-        const last = parts.slice(1).join(" ") || "";
-        await db
-          .update(usersTable)
-          .set({ firstName: first, lastName: last })
-          .where(eq(usersTable.id, userId));
-
-        const sid = getSessionId(req);
-        if (sid) {
-          const session = await getSession(sid);
-          if (session?.user) {
-            session.user.firstName = first;
-            session.user.lastName = last;
-            await updateSession(sid, session);
+          for (const target of targets) {
+            await db
+              .update(quizReportsTable)
+              .set({ userName: newName })
+              .where(eq(quizReportsTable.userName, target));
           }
-        }
-      } catch (err) {
-        console.error("Failed to sync past quiz reports with new displayName:", err);
-      }
-    }
 
-    res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+          // Also update usersTable and current session if this is an authenticated user
+          const parts = newName.split(" ");
+          const first = parts[0] || newName;
+          const last = parts.slice(1).join(" ") || "";
+          await db
+            .update(usersTable)
+            .set({ firstName: first, lastName: last })
+            .where(eq(usersTable.id, userId));
+
+          const sid = getSessionId(req);
+          if (sid) {
+            const session = await getSession(sid);
+            if (session?.user) {
+              session.user.firstName = first;
+              session.user.lastName = last;
+              await updateSession(sid, session);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to sync past quiz reports with new displayName:", err);
+        }
+      }
+
+      res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+    }
+  } catch (err: any) {
+    if (err?.code === "23505" || err?.message?.includes("idx_profiles_display_name_unique")) {
+      res.status(409).json({
+        error: `The name "${displayName}" is already taken by another student. Please choose a unique name.`,
+      });
+      return;
+    }
+    console.error("Profile save error:", err);
+    res.status(500).json({ error: "Failed to save profile." });
   }
 });
 

@@ -60,6 +60,7 @@ export function ProfilePage() {
   const [gender, setGender] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   // Change Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -93,6 +94,22 @@ export function ProfilePage() {
 
   async function handleSave() {
     setSaving(true);
+    setProfileError("");
+
+    const res = await saveProfile({
+      displayName: displayName || null,
+      rollNumber: rollNumber || null,
+      department: department || null,
+      section: section || null,
+      gender: gender || null,
+    } as any);
+
+    if (res && !res.ok) {
+      setSaving(false);
+      setProfileError(res.error || "Failed to save profile. Name may already be in use.");
+      return;
+    }
+
     if (isGuest) {
       const parts = displayName.trim().split(" ");
       const first = parts[0] || "";
@@ -105,13 +122,6 @@ export function ProfilePage() {
       localStorage.setItem("quizzy_student_sem", String(semester));
       window.dispatchEvent(new Event("quizzy_semester_updated"));
     }
-    await saveProfile({
-      displayName: displayName || null,
-      rollNumber: rollNumber || null,
-      department: department || null,
-      section: section || null,
-      gender: gender || null,
-    } as any);
     await refreshProfile();
     if (refreshAuth) {
       try {
@@ -319,10 +329,21 @@ export function ProfilePage() {
             <label className="text-xs font-semibold text-muted-foreground">Full Name</label>
             <input
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                if (profileError) setProfileError("");
+              }}
               placeholder="e.g., Hamid Mukhtar"
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              className={`w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border text-foreground transition-colors ${
+                profileError ? "border-red-500 focus:border-red-500" : "border-border focus:border-blue-500"
+              }`}
             />
+            {profileError && (
+              <p className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1">
+                <span>⚠️</span>
+                <span>{profileError}</span>
+              </p>
+            )}
           </div>
 
           {/* Gender toggle */}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { TopNavbar } from "@/components/TopNavbar";
 import { useUser } from "@/context/UserContext";
+import { Maximize2, Minimize2, ExternalLink } from "lucide-react";
 
 const API = import.meta.env.BASE_URL + "api";
 
@@ -58,6 +59,22 @@ export function VaultPage() {
 
   // Modal state (Only preview allowed here; all upload options removed outside admin dashboard)
   const [previewDoc, setPreviewDoc] = useState<VaultDoc | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close or exit fullscreen on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else if (previewDoc) {
+          setPreviewDoc(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, previewDoc]);
 
   // 1. Fetch vault accessibility settings
   useEffect(() => {
@@ -510,23 +527,30 @@ export function VaultPage() {
         {/* ─── PREVIEW MODAL ─── */}
         <AnimatePresence>
           {previewDoc && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className={`fixed inset-0 z-50 flex items-center justify-center ${isFullscreen ? "p-0" : "p-4"}`}>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/70 backdrop-blur-md"
-                onClick={() => setPreviewDoc(null)}
+                onClick={() => {
+                  setPreviewDoc(null);
+                  setIsFullscreen(false);
+                }}
               />
 
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="relative w-full max-w-3xl max-h-[90vh] rounded-3xl p-6 shadow-2xl z-10 flex flex-col vault-glass-card"
+                className={
+                  isFullscreen
+                    ? "fixed inset-0 z-50 w-screen h-screen max-w-none max-h-none rounded-none p-4 md:p-6 shadow-2xl flex flex-col bg-card"
+                    : "relative w-full max-w-4xl max-h-[90vh] rounded-3xl p-6 shadow-2xl z-10 flex flex-col vault-glass-card"
+                }
                 style={{
                   background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
+                  border: isFullscreen ? "none" : "1px solid hsl(var(--border))",
                 }}
               >
                 {/* Header */}
@@ -539,6 +563,11 @@ export function VaultPage() {
                       <span className="text-xs text-muted-foreground">
                         {subjects.find((s) => s.id === previewDoc.subjectId)?.name || "Subject"}
                       </span>
+                      {isFullscreen && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                          Fullscreen Mode
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-lg font-black truncate" style={{ fontFamily: "'Poppins', sans-serif" }}>
                       {previewDoc.title}
@@ -546,18 +575,52 @@ export function VaultPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Fullscreen Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreen(!isFullscreen)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border shadow flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isFullscreen
+                          ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                          : "bg-muted text-foreground border-border hover:bg-muted/80"
+                      }`}
+                      title={isFullscreen ? "Exit Fullscreen (Esc)" : "Expand to Fullscreen"}
+                    >
+                      {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
+                    </button>
+
+                    {/* Open in new tab */}
+                    <a
+                      href={previewDoc.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-foreground bg-muted hover:bg-muted/80 border border-border shadow flex items-center gap-1.5 transition-all"
+                      title="Open in new window"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">New Tab</span>
+                    </a>
+
+                    {/* Download button */}
                     <a
                       href={previewDoc.fileUrl}
                       download={previewDoc.fileName}
                       className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1.5"
                     >
                       <span>⬇️</span>
-                      <span>Download</span>
+                      <span className="hidden sm:inline">Download</span>
                     </a>
+
+                    {/* Close button */}
                     <button
                       type="button"
-                      onClick={() => setPreviewDoc(null)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-muted/80 text-muted-foreground text-sm font-bold"
+                      onClick={() => {
+                        setPreviewDoc(null);
+                        setIsFullscreen(false);
+                      }}
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-muted/80 text-muted-foreground text-sm font-bold cursor-pointer"
+                      title="Close (Esc)"
                     >
                       ✕
                     </button>
@@ -565,18 +628,22 @@ export function VaultPage() {
                 </div>
 
                 {/* Preview Viewport */}
-                <div className="flex-1 my-4 overflow-y-auto max-h-[60vh] rounded-2xl bg-muted/40 border border-border/60 p-4 flex flex-col items-center justify-center">
+                <div
+                  className={`flex-1 my-3 overflow-hidden rounded-2xl bg-muted/40 border border-border/60 flex flex-col items-center justify-center ${
+                    isFullscreen ? "h-[calc(100vh-140px)] max-h-none p-2" : "max-h-[60vh] p-4 overflow-y-auto"
+                  }`}
+                >
                   {previewDoc.fileUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") ? (
                     <img
                       src={previewDoc.fileUrl}
                       alt={previewDoc.title}
-                      className="max-h-[50vh] w-auto object-contain rounded-xl shadow"
+                      className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-xl shadow`}
                     />
                   ) : previewDoc.fileUrl.startsWith("data:application/pdf") || previewDoc.fileName.endsWith(".pdf") ? (
                     <iframe
                       src={previewDoc.fileUrl}
                       title={previewDoc.title}
-                      className="w-full h-[50vh] rounded-xl border border-border"
+                      className={`w-full rounded-xl border border-border ${isFullscreen ? "h-full" : "h-[50vh]"}`}
                     />
                   ) : (
                     <div className="text-center p-8">
@@ -597,7 +664,7 @@ export function VaultPage() {
                 </div>
 
                 {/* Footer notes */}
-                {previewDoc.description && (
+                {previewDoc.description && !isFullscreen && (
                   <div className="p-3 rounded-xl bg-muted/60 text-xs text-muted-foreground">
                     <strong className="text-foreground block mb-0.5">Notes:</strong>
                     {previewDoc.description}
