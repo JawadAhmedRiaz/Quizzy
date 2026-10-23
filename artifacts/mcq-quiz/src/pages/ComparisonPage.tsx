@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { useGetQuizUsers, useCompareUsers, getGetQuizUsersQueryKey, getCompareUsersQueryKey } from "@workspace/api-client-react";
@@ -12,6 +12,7 @@ export function ComparisonPage() {
 
   const [compare1, setCompare1] = useState("");
   const [compare2, setCompare2] = useState("");
+  const hasInitialized = useRef(false);
 
   const { data: usersRaw, isLoading: usersLoading } = useGetQuizUsers({
     query: { queryKey: getGetQuizUsersQueryKey() },
@@ -19,29 +20,41 @@ export function ComparisonPage() {
   const rawUsers = Array.isArray(usersRaw) ? usersRaw : [];
 
   // Always ensure the current student's displayName is in the list
-  const users = [...rawUsers];
-  if (displayName && !users.some((u) => u.userName.toLowerCase() === displayName.toLowerCase())) {
-    users.unshift({ userName: displayName, attempts: 0 });
-  }
+  const users = useMemo(() => {
+    const list = [...rawUsers];
+    if (displayName && !list.some((u) => u.userName.toLowerCase() === displayName.toLowerCase())) {
+      list.unshift({ userName: displayName, attempts: 0 });
+    }
+    return list;
+  }, [rawUsers, displayName]);
 
-  // Initialize Student 1 to the current student's displayName
+  // Initialize Student 1 and Student 2 ONLY ONCE when users list is first available
   useEffect(() => {
-    if (displayName) {
-      setCompare1(displayName);
-    } else if (users.length > 0 && !compare1) {
-      setCompare1(users[0].userName);
+    if (hasInitialized.current) return;
+    if (users.length > 0) {
+      const initial1 = displayName || users[0].userName;
+      setCompare1(initial1);
+      const other = users.find((u) => u.userName.toLowerCase() !== initial1.toLowerCase());
+      if (other) {
+        setCompare2(other.userName);
+      } else if (users.length > 1) {
+        setCompare2(users[1].userName);
+      }
+      hasInitialized.current = true;
     }
   }, [users, displayName]);
 
-  // Set default student 2 to a different student
-  useEffect(() => {
-    if (users.length > 1 && (!compare2 || compare2 === compare1)) {
-      const other = users.find((u) => u.userName !== compare1);
-      if (other) {
-        setCompare2(other.userName);
-      }
+  function handleSelectStudent1(val: string) {
+    setCompare1(val);
+    if (val && val.toLowerCase() === compare2.toLowerCase()) {
+      const other = users.find((u) => u.userName.toLowerCase() !== val.toLowerCase());
+      if (other) setCompare2(other.userName);
     }
-  }, [users, compare1, compare2]);
+  }
+
+  function handleSelectStudent2(val: string) {
+    setCompare2(val);
+  }
 
   const { data: compareData, isLoading: compareLoading } = useCompareUsers(
     { user1: compare1, user2: compare2 },
@@ -53,24 +66,28 @@ export function ComparisonPage() {
     }
   );
 
-  const compareChartData =
-    compareData && compareData.length === 2
-      ? (() => {
-          const subjectSet = new Set([
-            ...compareData[0].bySubject.map((s) => s.subject),
-            ...compareData[1].bySubject.map((s) => s.subject),
-          ]);
-          return Array.from(subjectSet).map((subj) => {
-            const s1 = compareData[0].bySubject.find((s) => s.subject === subj);
-            const s2 = compareData[1].bySubject.find((s) => s.subject === subj);
-            return {
-              name: subj,
-              [compareData[0].userName]: s1 ? Math.round(s1.avgPct) : 0,
-              [compareData[1].userName]: s2 ? Math.round(s2.avgPct) : 0,
-            };
-          });
-        })()
-      : [];
+  const name1 = compareData?.[0]?.userName || compare1 || "Student 1";
+  const name2 = compareData?.[1]?.userName || compare2 || "Student 2";
+
+  const compareChartData = useMemo(() => {
+    if (!compareData || compareData.length < 2) return [];
+    const s1List = compareData[0]?.bySubject || [];
+    const s2List = compareData[1]?.bySubject || [];
+    const subjectSet = new Set([
+      ...s1List.map((s) => s.subject),
+      ...s2List.map((s) => s.subject),
+    ]);
+    if (subjectSet.size === 0) return [];
+    return Array.from(subjectSet).map((subj) => {
+      const s1 = s1List.find((s) => s.subject === subj);
+      const s2 = s2List.find((s) => s.subject === subj);
+      return {
+        name: subj,
+        [name1]: s1 ? Math.round(s1.avgPct) : 0,
+        [name2]: s2 ? Math.round(s2.avgPct) : 0,
+      };
+    });
+  }, [compareData, name1, name2]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
@@ -114,7 +131,7 @@ export function ComparisonPage() {
               </label>
               <select
                 value={compare1}
-                onChange={(e) => setCompare1(e.target.value)}
+                onChange={(e) => handleSelectStudent1(e.target.value)}
                 disabled={usersLoading}
                 className="w-full px-4 py-3 rounded-2xl text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-blue-500 transition-all cursor-pointer shadow-xs"
               >
@@ -135,13 +152,13 @@ export function ComparisonPage() {
               </label>
               <select
                 value={compare2}
-                onChange={(e) => setCompare2(e.target.value)}
+                onChange={(e) => handleSelectStudent2(e.target.value)}
                 disabled={usersLoading}
                 className="w-full px-4 py-3 rounded-2xl text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-amber-500 transition-all cursor-pointer shadow-xs"
               >
                 <option value="">— Select student —</option>
                 {users
-                  .filter((u) => u.userName !== compare1)
+                  .filter((u) => u.userName.toLowerCase() !== compare1.toLowerCase())
                   .map((u) => (
                     <option key={u.userName} value={u.userName}>
                       {u.userName} ({u.attempts} {u.attempts === 1 ? "quiz" : "quizzes"})
@@ -174,7 +191,7 @@ export function ComparisonPage() {
                 const accentColor = isFirst ? "#007aff" : "#f59e0b";
                 return (
                   <div
-                    key={d.userName}
+                    key={`${d.userName}-${i}`}
                     className="rounded-3xl p-5 border shadow-lg relative overflow-hidden"
                     style={{
                       background: "hsl(var(--card)/0.85)",
@@ -217,7 +234,7 @@ export function ComparisonPage() {
             </div>
 
             {/* Subject Mastery Bar Chart */}
-            {compareChartData.length > 0 && (
+            {compareChartData.length > 0 ? (
               <div
                 className="rounded-3xl p-6 border border-border shadow-xl"
                 style={{
@@ -251,11 +268,20 @@ export function ComparisonPage() {
                         }}
                       />
                       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                      <Bar dataKey={compareData[0].userName} fill="#007aff" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey={compareData[1].userName} fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey={name1} fill="#007aff" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey={name2} fill="#f59e0b" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-3xl p-6 border border-border shadow-md text-center"
+                style={{ background: "hsl(var(--card)/0.5)" }}
+              >
+                <p className="text-xs font-semibold text-muted-foreground">
+                  📊 No shared subject attempts yet between {name1} and {name2}. Take a quiz in the same subject to see side-by-side charts!
+                </p>
               </div>
             )}
           </motion.div>

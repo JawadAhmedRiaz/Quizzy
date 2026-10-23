@@ -312,8 +312,8 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
 });
 
 router.get("/quiz-reports/compare", async (req, res): Promise<void> => {
-  const user1 = req.query.user1 as string;
-  const user2 = req.query.user2 as string;
+  const user1 = ((req.query.user1 as string) || "").trim();
+  const user2 = ((req.query.user2 as string) || "").trim();
   if (!user1 || !user2) {
     res.status(400).json({ error: "user1 and user2 are required" });
     return;
@@ -324,17 +324,29 @@ router.get("/quiz-reports/compare", async (req, res): Promise<void> => {
   const target2 = resolveName(user2, nameMap);
   const allReports = await db.select().from(quizReportsTable);
 
-  const r1 = allReports.filter((r) => {
-    const res = resolveName(r.userName, nameMap);
-    return r.userName === user1 || res === user1 || r.userName === target1 || res === target1;
-  });
+  function matches(reportUser: string, queryUser: string, targetUser: string): boolean {
+    const repLow = (reportUser || "").toLowerCase().trim();
+    const qLow = (queryUser || "").toLowerCase().trim();
+    const tLow = (targetUser || "").toLowerCase().trim();
+    const res = (resolveName(reportUser, nameMap) || "").toLowerCase().trim();
 
-  const r2 = allReports.filter((r) => {
-    const res = resolveName(r.userName, nameMap);
-    return r.userName === user2 || res === user2 || r.userName === target2 || res === target2;
-  });
+    if (repLow === qLow || repLow === tLow || res === qLow || res === tLow) return true;
 
-  res.json([buildAnalytics(target1, r1), buildAnalytics(target2, r2)]);
+    // Support flexible matching for common user aliases
+    if ((qLow.includes("jawad") || tLow.includes("jawad")) && (repLow.includes("jawad") || res.includes("jawad"))) {
+      return true;
+    }
+    if ((qLow.includes("hamid") || tLow.includes("hamid")) && (repLow.includes("hamid") || res.includes("hamid"))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  const r1 = allReports.filter((r) => matches(r.userName, user1, target1));
+  const r2 = allReports.filter((r) => matches(r.userName, user2, target2));
+
+  res.json([buildAnalytics(user1, r1), buildAnalytics(user2, r2)]);
 });
 
 function buildAnalytics(userName: string, reports: QuizReport[]) {
