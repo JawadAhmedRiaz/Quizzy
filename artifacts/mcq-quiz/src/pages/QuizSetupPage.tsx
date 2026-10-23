@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useUser } from "@/context/UserContext";
 import { useQuiz, type QuizDifficulty } from "@/context/QuizContext";
 import { getQuizMeta, getQuizQuestions, type QuizMeta } from "@/data/curriculum";
 import { useSettings } from "@/context/SettingsContext";
@@ -15,6 +16,7 @@ export function QuizSetupPage() {
   const { quizId } = useParams<{ quizId: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { displayName } = useUser();
   const settings = useSettings();
   const {
     playerName, setPlayerName,
@@ -50,11 +52,9 @@ export function QuizSetupPage() {
   }, [quizId]);
 
   useEffect(() => {
-    if (user && !playerName) {
-      const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-      if (name) setPlayerName(name);
-    }
-  }, [user]);
+    const active = displayName || (user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() : "") || playerName || "Student";
+    if (active) setPlayerName(active);
+  }, [user, displayName]);
 
   const meta = isDbQuiz ? dbData?.meta ?? null : getQuizMeta(quizId!);
   const questions: Question[] = isDbQuiz ? dbData?.questions ?? [] : getQuizQuestions(quizId!);
@@ -100,7 +100,10 @@ export function QuizSetupPage() {
   const selectedDifficulty = DIFFICULTIES.find((d) => d.id === difficulty)!;
 
   function handleStart() {
-    if (!playerName.trim()) { alert("Please enter your name!"); return; }
+    const active = (playerName || displayName || "Student").trim();
+    if (!playerName.trim()) {
+      setPlayerName(active);
+    }
     if (useCustom) setTotalToAttempt(finalCount);
     startSession(quizId!, questions, finalCount, meta);
     setIsLaunching(true);
@@ -122,21 +125,6 @@ export function QuizSetupPage() {
             Semester {meta.sem} · {meta.examLabel}
           </div>
         </motion.div>
-
-        {/* Name */}
-        <div className="glow-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "hsl(var(--muted-foreground))" }}>
-            👤 Your Name
-          </p>
-          <input
-            type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Enter your name…" maxLength={28}
-            className="w-full px-4 py-3 rounded-lg text-sm font-medium outline-none transition-all"
-            style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "#6366f1")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "hsl(var(--border))")}
-          />
-        </div>
 
         {/* MCQ count */}
         <div className="glow-card p-4">
