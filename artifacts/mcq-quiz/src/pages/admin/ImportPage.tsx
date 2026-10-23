@@ -207,7 +207,7 @@ export function ImportPage() {
         <div className="mb-6">
           <h1 className="text-xl font-black text-white">🤖 AI Ingestion Engine</h1>
           <p className="text-sm mt-0.5" style={{ color: "#94a3b8" }}>
-            Upload a document or paste raw MCQ text — Gemini 1.5 Flash parses and structures it.
+            Upload a document or paste raw MCQ text — Gemini 3.5 Flash-Lite parses and structures it.
           </p>
         </div>
 
