@@ -63,16 +63,6 @@ export function DashboardPage() {
   const [recentReports, setRecentReports] = useState<any[]>([]);
 
   useEffect(() => {
-    setWeeklyStudyTime(getWeeklyStudyTime());
-    setTotalMinutes(getTotalStudyMinutes());
-    const interval = setInterval(() => {
-      setWeeklyStudyTime(getWeeklyStudyTime());
-      setTotalMinutes(getTotalStudyMinutes());
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     if (!effectiveUserId) return;
     // Fetch last quiz reports for recent history
     fetch(`${API}/quiz-reports/leaderboard?quizId=all`)
