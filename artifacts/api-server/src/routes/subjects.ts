@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { db, subjectsTable, questionsTable, semestersTable, systemConfigsTable } from "@workspace/db";
+import { autoGenerateMissingBriefings } from "../lib/explanationService";
 
 const router: IRouter = Router();
 
@@ -100,6 +101,11 @@ router.get("/quiz-questions/:quizId", async (req, res): Promise<void> => {
         eq(questionsTable.examType, examTypeRaw.charAt(0).toUpperCase() + examTypeRaw.slice(1)),
       ),
     );
+
+  // Background heal: if any questions are missing explanations, generate them automatically
+  if (questions.some((q) => !q.briefing || !q.briefing.trim())) {
+    autoGenerateMissingBriefings(15).catch(() => null);
+  }
 
   res.json({
     meta: {

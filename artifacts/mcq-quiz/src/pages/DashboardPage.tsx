@@ -110,19 +110,27 @@ export function DashboardPage() {
   const rawSubjects = myAnalytics?.bySubject ?? [];
   const subjectPerformance = useMemo(() => {
     if (rawSubjects.length > 0) {
-      return rawSubjects.map((s) => ({
-        name: s.subject.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        rawSubject: s.subject,
-        pct: Math.round(s.avgPct),
-        attempts: s.attempts,
-      }));
+      return rawSubjects.map((s) => {
+        let name = s.subject.replace(/-/g, " ").trim();
+        if (/^programing$/i.test(name) || /^programming$/i.test(name)) {
+          name = "Programming";
+        } else {
+          name = name.replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+        return {
+          name,
+          rawSubject: s.subject,
+          pct: Math.round(s.avgPct),
+          attempts: s.attempts,
+        };
+      });
     }
     return [];
   }, [rawSubjects]);
 
-  // Strong vs Weak subjects
-  const strongSubjects = useMemo(() => subjectPerformance.filter((s) => s.pct >= 70), [subjectPerformance]);
-  const weakSubjects = useMemo(() => subjectPerformance.filter((s) => s.pct < 70), [subjectPerformance]);
+  // Strong vs Weak subjects aligned with histogram thresholds (>75% Strong, <75% Focus/Moderate)
+  const strongSubjects = useMemo(() => subjectPerformance.filter((s) => s.pct >= 75), [subjectPerformance]);
+  const weakSubjects = useMemo(() => subjectPerformance.filter((s) => s.pct < 75), [subjectPerformance]);
 
   // Badges data
   const earnedBadgeIds = new Set(gamification?.badges?.map((b) => b.badgeId) || []);
@@ -354,7 +362,7 @@ export function DashboardPage() {
 
             <div className="h-56 sm:h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklyStudyTime} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={weeklyStudyTime} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="timeGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#007AFF" stopOpacity={0.45} />
@@ -382,9 +390,10 @@ export function DashboardPage() {
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                       fontSize: "12px",
+                      color: "hsl(var(--foreground))",
                     }}
                     formatter={(val: any) => [`${val} minutes`, "Active Study"]}
-                    labelStyle={{ fontWeight: "bold" }}
+                    labelStyle={{ fontWeight: "bold", color: "hsl(var(--foreground))" }}
                   />
                   <Area
                     type="monotone"
@@ -442,7 +451,7 @@ export function DashboardPage() {
             ) : (
               <div className="h-56 sm:h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={subjectPerformance} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                  <BarChart data={subjectPerformance} margin={{ top: 10, right: 10, left: -10, bottom: 45 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border)/0.5)" />
                     <XAxis
                       dataKey="name"
@@ -450,11 +459,13 @@ export function DashboardPage() {
                       axisLine={{ stroke: "hsl(var(--border))" }}
                       tickLine={false}
                       interval={0}
-                      angle={-20}
+                      angle={-25}
                       textAnchor="end"
+                      height={45}
                     />
                     <YAxis
                       domain={[0, 100]}
+                      ticks={[0, 25, 50, 75, 100]}
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
@@ -467,9 +478,10 @@ export function DashboardPage() {
                         borderRadius: "12px",
                         boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                         fontSize: "12px",
+                        color: "hsl(var(--foreground))",
                       }}
                       formatter={(val: any) => [`${val}%`, "Subject Score"]}
-                      labelStyle={{ fontWeight: "bold" }}
+                      labelStyle={{ fontWeight: "bold", color: "hsl(var(--foreground))" }}
                     />
                     <Bar dataKey="pct" radius={[6, 6, 0, 0]}>
                       {subjectPerformance.map((entry, index) => {

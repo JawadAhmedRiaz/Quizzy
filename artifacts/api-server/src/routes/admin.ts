@@ -14,6 +14,7 @@ import {
   feedbacksTable,
 } from "@workspace/db";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
+import { autoGenerateMissingBriefings } from "../lib/explanationService";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -514,6 +515,11 @@ router.post("/admin/questions/batch", adminMiddleware, async (req, res): Promise
     const semLabel = `${ordinals[sem - 1] ?? sem + "th"} Semester`;
     await db.insert(semestersTable).values({ num: sem, label: semLabel, sortOrder: sem }).onConflictDoNothing();
   }
+
+  // Automatically generate AI explanations in the background for any new questions without briefings
+  autoGenerateMissingBriefings(inserted.length).catch((err) =>
+    console.error("[Admin Batch] Auto-generate briefings error:", err)
+  );
 
   res.status(201).json({ inserted: inserted.length });
 });
