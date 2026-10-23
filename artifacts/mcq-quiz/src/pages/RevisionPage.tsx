@@ -59,12 +59,6 @@ export function RevisionPage() {
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>(() => getAllMistakes());
-  const [attemptedSelections, setAttemptedSelections] = useState<Record<string, number>>({});
-
-  const handleCardAttempt = (cardId: string, optIndex: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setAttemptedSelections((prev) => ({ ...prev, [cardId]: optIndex }));
-  };
 
   // Refresh mistakes when stats change
   useEffect(() => {
@@ -399,7 +393,7 @@ export function RevisionPage() {
 
             {/* 3D Flip Flashcard */}
             <div
-              className="w-full max-w-2xl min-h-[440px] perspective-[1000px] cursor-pointer relative"
+              className="w-full max-w-2xl h-[420px] sm:h-[380px] perspective-[1000px] cursor-pointer relative"
               onClick={() => setIsFlipped(!isFlipped)}
             >
               <motion.div
@@ -408,9 +402,9 @@ export function RevisionPage() {
                 transition={{ duration: 0.5, ease: "easeInOut" }}
                 style={{ transformStyle: "preserve-3d" }}
               >
-                {/* ── CARD FRONT (Question & Interactive Options) ── */}
+                {/* ── CARD FRONT (Question & What You Chose) ── */}
                 <div
-                  className="rounded-3xl p-6 sm:p-8 bg-card border border-border/80 shadow-lg flex flex-col justify-between backface-hidden overflow-y-auto max-h-[560px]"
+                  className="absolute inset-0 rounded-3xl p-6 sm:p-8 bg-card border border-border/80 shadow-lg flex flex-col justify-between backface-hidden overflow-y-auto"
                   style={{
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
@@ -418,7 +412,7 @@ export function RevisionPage() {
                 >
                   <div>
                     {/* Tags */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center justify-between gap-2 mb-4">
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                           {currentCard.subject}
@@ -431,108 +425,24 @@ export function RevisionPage() {
                       </div>
                       <span className="text-xs text-amber-500 font-bold flex items-center gap-1">
                         <HelpCircle className="w-3.5 h-3.5" />
-                        <span>Interactive Revision Card</span>
+                        <span>Question</span>
                       </span>
                     </div>
 
                     {/* Question Text */}
-                    <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug mb-3">
+                    <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug mb-5">
                       {currentCard.question.q}
                     </h3>
 
-                    {/* Interactive MCQ Options */}
-                    <div className="flex flex-col gap-2 my-2" onClick={(e) => e.stopPropagation()}>
-                      {currentCard.question.o.map((opt, i) => {
-                        const isAttempted = attemptedSelections[currentCard.id] !== undefined;
-                        const isSelected = attemptedSelections[currentCard.id] === i;
-                        const isCorrect = i === currentCard.question.a;
-
-                        let btnClass = "bg-muted/40 border-border/80 text-foreground hover:bg-muted/70 hover:border-blue-500/50";
-                        if (isAttempted) {
-                          if (isCorrect) {
-                            btnClass = "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold";
-                          } else if (isSelected) {
-                            btnClass = "bg-red-500/15 border-red-500/40 text-red-600 dark:text-red-400 font-bold";
-                          } else {
-                            btnClass = "bg-muted/20 border-border/30 text-muted-foreground/50 opacity-60";
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={(e) => handleCardAttempt(currentCard.id, i, e)}
-                            disabled={isAttempted}
-                            className={`w-full text-left p-3 rounded-xl text-xs sm:text-sm border transition-all flex items-start gap-2.5 ${btnClass} ${
-                              isAttempted ? "cursor-default" : "cursor-pointer"
-                            }`}
-                          >
-                            <span
-                              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
-                                isAttempted && isCorrect
-                                  ? "bg-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                                  : isAttempted && isSelected
-                                  ? "bg-red-500/30 text-red-600 dark:text-red-400"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {String.fromCharCode(65 + i)}
-                            </span>
-                            <span className="flex-1 leading-snug">{opt}</span>
-                            {isAttempted && isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />}
-                            {isAttempted && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Feedback on Attempt */}
-                    {attemptedSelections[currentCard.id] !== undefined && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`p-3.5 rounded-2xl border text-xs leading-relaxed my-2 shadow-xs ${
-                          attemptedSelections[currentCard.id] === currentCard.question.a
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-100"
-                            : "bg-red-500/10 border-red-500/30 text-red-950 dark:text-red-100"
-                        }`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-between gap-2 mb-2 font-bold">
-                          <span className="flex items-center gap-1.5">
-                            {attemptedSelections[currentCard.id] === currentCard.question.a
-                              ? "✅ Correct Answer!"
-                              : "❌ Incorrect Attempt"}
-                          </span>
-                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                            Correct: Option ({String.fromCharCode(65 + currentCard.question.a)})
-                          </span>
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-card border border-border/80 text-foreground">
-                          <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">
-                            💡 Concept Breakdown:
-                          </span>
-                          <p className="text-muted-foreground leading-relaxed text-xs font-medium">
-                            {currentCard.question.e && currentCard.question.e.trim().length > 0
-                              ? currentCard.question.e
-                              : `Option (${String.fromCharCode(65 + currentCard.question.a)}) "${
-                                  currentCard.question.o[currentCard.question.a]
-                                }" is the verified conceptual answer for ${currentCard.subject}.`}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Option Peek / What they answered in past exam */}
-                    {attemptedSelections[currentCard.id] === undefined && currentCard.selectedOptionIndex !== null && (
-                      <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-2.5 text-xs mb-2">
-                        <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    {/* Only the option chosen in the quiz */}
+                    {currentCard.selectedOptionIndex !== null && (
+                      <div className="p-3.5 sm:p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-xs sm:text-sm">
+                        <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                         <div>
-                          <span className="font-bold text-red-600 dark:text-red-400">
+                          <span className="font-bold text-red-600 dark:text-red-400 block mb-0.5">
                             Your previous quiz mistake was:
                           </span>
-                          <p className="text-foreground/90 font-medium mt-0.5">
+                          <p className="text-foreground/90 font-medium leading-relaxed">
                             {currentCard.question.o[currentCard.selectedOptionIndex] || "None selected"}
                           </p>
                         </div>
@@ -541,12 +451,8 @@ export function RevisionPage() {
                   </div>
 
                   {/* Tap prompt */}
-                  <div className="pt-3 mt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {attemptedSelections[currentCard.id] !== undefined
-                        ? "Attempt recorded. Flip for full notes."
-                        : "Click an option above to attempt question"}
-                    </span>
+                  <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Tap card or press Space to reveal answer</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <span>Flip Card</span>
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -556,7 +462,7 @@ export function RevisionPage() {
 
                 {/* ── CARD BACK (Correct Answer & Explanation) ── */}
                 <div
-                  className="rounded-3xl p-6 sm:p-8 bg-card border border-emerald-500/40 shadow-xl flex flex-col justify-between backface-hidden overflow-y-auto max-h-[560px]"
+                  className="absolute inset-0 rounded-3xl p-6 sm:p-8 bg-card border border-emerald-500/40 shadow-xl flex flex-col justify-between backface-hidden overflow-y-auto"
                   style={{
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
