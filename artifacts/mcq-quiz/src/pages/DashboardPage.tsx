@@ -66,7 +66,7 @@ export function DashboardPage() {
   const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(displayName || undefined);
 
   // Fetch live analytics
-  const myKey = effectiveUserId ?? displayName ?? "";
+  const myKey = displayName || effectiveUserId || "";
   const { data: myAnalytics, isLoading: analyticsLoading } = useGetUserAnalytics(
     { userName: myKey },
     { query: { enabled: !!myKey, queryKey: getGetUserAnalyticsQueryKey({ userName: myKey }) } }

@@ -168,6 +168,26 @@ router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
   res.json(Array.from(aggregated.values()));
 });
 
+function matchesUser(reportUser: string, queryUser: string, targetResolved: string, nameMap: Map<string, string>): boolean {
+  if (!reportUser || !queryUser) return false;
+  const r = reportUser.toLowerCase().trim();
+  const q = queryUser.toLowerCase().trim();
+  const t = (targetResolved || "").toLowerCase().trim();
+  const res = (resolveName(reportUser, nameMap) || "").toLowerCase().trim();
+
+  if (r === q || r === t || res === q || res === t) return true;
+
+  // Flexible match for common student aliases
+  if ((q.includes("jawad") || t.includes("jawad")) && (r.includes("jawad") || res.includes("jawad"))) {
+    return true;
+  }
+  if ((q.includes("hamid") || t.includes("hamid")) && (r.includes("hamid") || res.includes("hamid"))) {
+    return true;
+  }
+
+  return false;
+}
+
 router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
   if (!userName) {
@@ -178,15 +198,7 @@ router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
   const targetResolved = resolveName(userName, nameMap);
   const allReports = await db.select().from(quizReportsTable);
 
-  const reports = allReports.filter((r) => {
-    const rResolved = resolveName(r.userName, nameMap);
-    return (
-      r.userName === userName ||
-      rResolved === userName ||
-      r.userName === targetResolved ||
-      rResolved === targetResolved
-    );
-  });
+  const reports = allReports.filter((r) => matchesUser(r.userName, userName, targetResolved, nameMap));
 
   res.json(buildAnalytics(targetResolved, reports));
 });
@@ -194,18 +206,12 @@ router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
 router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
   const nameMap = await getUserNameMap();
-  const targetResolved = userName ? resolveName(userName, nameMap) : null;
+  const targetResolved = userName ? resolveName(userName, nameMap) : "";
   const allReports = await db.select().from(quizReportsTable).orderBy(quizReportsTable.createdAt);
 
   const reports = allReports.filter((r) => {
     if (!userName || !userName.trim()) return false;
-    const rResolved = resolveName(r.userName, nameMap);
-    return (
-      r.userName === userName ||
-      rResolved === userName ||
-      r.userName === targetResolved ||
-      rResolved === targetResolved
-    );
+    return matchesUser(r.userName, userName, targetResolved, nameMap);
   });
 
   // Calculate actual daily study minutes from completed exams
@@ -230,15 +236,7 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
   const targetResolved = resolveName(userName, nameMap);
   const allReports = await db.select().from(quizReportsTable).orderBy(desc(quizReportsTable.id));
 
-  const userReports = allReports.filter((r) => {
-    const rResolved = resolveName(r.userName, nameMap);
-    return (
-      r.userName === userName ||
-      rResolved === userName ||
-      r.userName === targetResolved ||
-      rResolved === targetResolved
-    );
-  });
+  const userReports = allReports.filter((r) => matchesUser(r.userName, userName, targetResolved, nameMap));
 
   // Cache questionsTable to look up full question text, options, and explanations
   let allDbQuestions: any[] = [];
