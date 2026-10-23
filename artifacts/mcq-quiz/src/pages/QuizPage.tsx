@@ -97,17 +97,22 @@ export function QuizPage() {
     let filteredQs = allQs;
 
     (async () => {
+      const poolPreference = sessionStorage.getItem(`quizzy_pool_${quizId}`);
+
       if (effectiveUserId) {
         try {
           const r = await fetch(`${API}/profile/${effectiveUserId}/attempted?quizId=${quizId}`);
           if (r.ok) {
             const data = await r.json();
             const attempted: string[] = data.questionHashes ?? [];
-            if (attempted.length > 0) {
+
+            if (poolPreference === "all") {
+              filteredQs = allQs;
+            } else if (attempted.length > 0) {
               const remaining = allQs.filter(q => !attempted.includes(qHash(q)));
               if (remaining.length === 0) {
                 const reset = window.confirm(
-                  `You've already attempted all ${allQs.length} questions! Do you want to start over with all questions?`
+                  `You've already attempted all ${allQs.length} questions in this quiz! Would you like to practice all questions again from the beginning?`
                 );
                 if (reset) {
                   await fetch(`${API}/profile/${effectiveUserId}/attempted`, {
@@ -119,11 +124,23 @@ export function QuizPage() {
                   navigate("/");
                   return;
                 }
-              } else {
-                if (remaining.length < allQs.length) {
-                  alert(`You've already attempted ${attempted.length} questions. Starting from the remaining ${remaining.length} questions.`);
+              } else if (remaining.length < allQs.length) {
+                if (poolPreference === "remaining") {
+                  filteredQs = remaining;
+                } else {
+                  const wantAll = window.confirm(
+                    `You've previously attempted ${attempted.length} of ${allQs.length} questions.\n\n• Click OK to practice ALL ${allQs.length} questions (including previous ones).\n• Click Cancel to practice only the ${remaining.length} remaining unattempted questions.`
+                  );
+                  if (wantAll) {
+                    await fetch(`${API}/profile/${effectiveUserId}/attempted`, {
+                      method: "DELETE", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ quizId }),
+                    });
+                    filteredQs = allQs;
+                  } else {
+                    filteredQs = remaining;
+                  }
                 }
-                filteredQs = remaining;
               }
             }
           }

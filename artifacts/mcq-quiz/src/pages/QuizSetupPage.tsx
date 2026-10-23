@@ -16,7 +16,7 @@ export function QuizSetupPage() {
   const { quizId } = useParams<{ quizId: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { displayName } = useUser();
+  const { displayName, effectiveUserId } = useUser();
   const settings = useSettings();
   const {
     playerName, setPlayerName,
@@ -27,6 +27,8 @@ export function QuizSetupPage() {
   const [customCount, setCustomCount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [attemptedCount, setAttemptedCount] = useState(0);
+  const [poolMode, setPoolMode] = useState<"remaining" | "all">("remaining");
 
   const DIFFICULTIES: { id: QuizDifficulty; label: string; time: string; sub: string }[] = [
     { id: "easy", label: "Easy", time: `${settings.easyTime}s`, sub: "Practice pace" },
@@ -55,6 +57,17 @@ export function QuizSetupPage() {
     const active = displayName || (user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() : "") || playerName || "Student";
     if (active) setPlayerName(active);
   }, [user, displayName]);
+
+  useEffect(() => {
+    if (!effectiveUserId || !quizId) return;
+    fetch(`${API}/profile/${effectiveUserId}/attempted?quizId=${quizId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const hashes: string[] = d?.questionHashes ?? [];
+        setAttemptedCount(hashes.length);
+      })
+      .catch(() => null);
+  }, [effectiveUserId, quizId]);
 
   const meta = isDbQuiz ? dbData?.meta ?? null : getQuizMeta(quizId!);
   const questions: Question[] = isDbQuiz ? dbData?.questions ?? [] : getQuizQuestions(quizId!);
@@ -99,12 +112,25 @@ export function QuizSetupPage() {
     : totalToAttempt;
   const selectedDifficulty = DIFFICULTIES.find((d) => d.id === difficulty)!;
 
-  function handleStart() {
+  async function handleStart() {
     const active = (playerName || displayName || "Student").trim();
     if (!playerName.trim()) {
       setPlayerName(active);
     }
     if (useCustom) setTotalToAttempt(finalCount);
+
+    sessionStorage.setItem(`quizzy_pool_${quizId}`, poolMode);
+
+    if (poolMode === "all" && effectiveUserId) {
+      try {
+        await fetch(`${API}/profile/${effectiveUserId}/attempted`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quizId }),
+        });
+      } catch {}
+    }
+
     startSession(quizId!, questions, finalCount, meta);
     setIsLaunching(true);
   }
@@ -125,6 +151,53 @@ export function QuizSetupPage() {
             Semester {meta.sem} · {meta.examLabel}
           </div>
         </motion.div>
+
+        {/* Question Pool Choice (if student has attempted questions before) */}
+        {attemptedCount > 0 && (
+          <div className="glow-card p-4 rounded-2xl flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span>📚</span>
+                <span>Question Pool</span>
+              </p>
+              <span className="text-xs text-blue-500 font-bold">
+                {attemptedCount} / {questions.length} attempted
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPoolMode("remaining")}
+                className={`py-3 px-3 rounded-xl text-left transition-all ${
+                  poolMode === "remaining"
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                <div className="font-bold text-xs">🎯 Unattempted Only</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  {Math.max(0, questions.length - attemptedCount)} remaining
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPoolMode("all")}
+                className={`py-3 px-3 rounded-xl text-left transition-all ${
+                  poolMode === "all"
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                <div className="font-bold text-xs">🔄 All Questions</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  Include all {questions.length} (repeat old)
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* MCQ count */}
         <div className="glow-card p-4">
