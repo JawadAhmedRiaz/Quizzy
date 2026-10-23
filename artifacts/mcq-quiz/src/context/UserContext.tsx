@@ -162,9 +162,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const currentGuestName = isGuest ? getGuestDisplayName() : null;
 
+  const profileDisplayName =
+    profile?.displayName && profile.displayName.trim() && profile.displayName !== "Guest"
+      ? profile.displayName.trim()
+      : null;
+
   const displayName =
+    profileDisplayName ||
     authDisplayName ||
-    (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null) ||
     currentGuestName ||
     (isGuest ? "Guest Scholar" : "User");
 

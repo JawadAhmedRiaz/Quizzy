@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, profilesTable, attemptedQuestionsTable, quizReportsTable } from "@workspace/db";
+import { db, profilesTable, attemptedQuestionsTable, quizReportsTable, usersTable } from "@workspace/db";
+import { getSessionId, getSession, updateSession } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -58,6 +59,25 @@ router.post("/profile", async (req, res): Promise<void> => {
             .update(quizReportsTable)
             .set({ userName: newName })
             .where(eq(quizReportsTable.userName, target));
+        }
+
+        // Also update usersTable and current session if this is an authenticated user
+        const parts = newName.split(" ");
+        const first = parts[0] || newName;
+        const last = parts.slice(1).join(" ") || "";
+        await db
+          .update(usersTable)
+          .set({ firstName: first, lastName: last })
+          .where(eq(usersTable.id, userId));
+
+        const sid = getSessionId(req);
+        if (sid) {
+          const session = await getSession(sid);
+          if (session?.user) {
+            session.user.firstName = first;
+            session.user.lastName = last;
+            await updateSession(sid, session);
+          }
         }
       } catch (err) {
         console.error("Failed to sync past quiz reports with new displayName:", err);

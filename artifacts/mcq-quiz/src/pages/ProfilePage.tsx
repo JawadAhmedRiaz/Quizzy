@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
 import { TopNavbar } from "@/components/TopNavbar";
+import { AnimatedAvatar, getSavedAvatarId, saveAvatarId } from "@/components/AnimatedAvatar";
 
 const API = import.meta.env.BASE_URL + "api";
 
@@ -33,8 +34,23 @@ function xpLevelInfo(xp: number) {
 
 export function ProfilePage() {
   const [, navigate] = useLocation();
-  const { user, isAuthenticated, login, logout } = useAuth();
+  const { user, isAuthenticated, login, logout, refresh: refreshAuth } = useAuth();
   const { profile, gamification, saveProfile, refreshProfile, isGuest } = useUser();
+
+  // Avatar state
+  const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
+  function handleAvatarChange(newId: string) {
+    setAvatarId(newId);
+    saveAvatarId(newId);
+    window.dispatchEvent(new Event("quizzy_avatar_updated"));
+    window.dispatchEvent(new Event("storage"));
+  }
+
+  // Semester state
+  const [semester, setSemester] = useState<number>(() => {
+    const saved = localStorage.getItem("quizzy_student_sem");
+    return saved ? Number(saved) : 4;
+  });
 
   // Profile fields state
   const [displayName, setDisplayName] = useState("");
@@ -85,6 +101,10 @@ export function ProfilePage() {
       if (sur) localStorage.setItem("quizzy_guest_surname", sur);
       if (gender) localStorage.setItem("quizzy_guest_gender", gender);
     }
+    if (semester) {
+      localStorage.setItem("quizzy_student_sem", String(semester));
+      window.dispatchEvent(new Event("quizzy_semester_updated"));
+    }
     await saveProfile({
       displayName: displayName || null,
       rollNumber: rollNumber || null,
@@ -93,7 +113,13 @@ export function ProfilePage() {
       gender: gender || null,
     } as any);
     await refreshProfile();
+    if (refreshAuth) {
+      try {
+        await refreshAuth();
+      } catch {}
+    }
     window.dispatchEvent(new Event("quizzy_profile_updated"));
+    window.dispatchEvent(new Event("storage"));
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -212,21 +238,14 @@ export function ProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className="glow-card p-5 flex items-center gap-4 rounded-3xl"
         >
-          {isAuthenticated && user?.profileImageUrl ? (
-            <img
-              src={user.profileImageUrl}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover flex-shrink-0"
-              style={{ border: "2px solid rgba(0, 122, 255, 0.6)" }}
+          <div className="flex-shrink-0">
+            <AnimatedAvatar
+              avatarId={avatarId}
+              size={68}
+              interactive={true}
+              onSelectAvatar={handleAvatarChange}
             />
-          ) : (
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center text-3xl flex-shrink-0 font-black text-white shadow-md"
-              style={{ background: "linear-gradient(135deg, #007aff, #2563eb)" }}
-            >
-              {(displayNameFirst[0] || "U").toUpperCase()}
-            </div>
-          )}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-black text-base truncate">{displayNameFirst}</p>
@@ -238,11 +257,13 @@ export function ProfilePage() {
             {streakCount > 0 && (
               <p className="text-xs font-bold text-amber-500 mt-0.5">🔥 {streakCount}-day streak</p>
             )}
-            {gender && (
-              <p className="text-xs mt-0.5 text-muted-foreground">
-                {gender === "male" ? "👦 Male" : "👧 Female"}
-              </p>
-            )}
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-muted-foreground">
+              {gender && (
+                <span>{gender === "male" ? "👦 Male" : "👧 Female"}</span>
+              )}
+              <span>•</span>
+              <span className="font-semibold text-blue-500">🎓 Semester {semester}</span>
+            </div>
           </div>
         </motion.div>
 
@@ -371,6 +392,21 @@ export function ProfilePage() {
               placeholder="e.g., BCS-2A"
               className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
             />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-muted-foreground">Semester</label>
+            <select
+              value={semester}
+              onChange={(e) => setSemester(Number(e.target.value))}
+              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                <option key={s} value={s}>
+                  Semester {s}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button

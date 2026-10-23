@@ -49,6 +49,19 @@ export function DashboardPage() {
   });
   const [isEditingSem, setIsEditingSem] = useState(false);
 
+  useEffect(() => {
+    const handleSemUpdate = () => {
+      const saved = localStorage.getItem("quizzy_student_sem");
+      if (saved) setSelectedSemester(Number(saved));
+    };
+    window.addEventListener("storage", handleSemUpdate);
+    window.addEventListener("quizzy_semester_updated", handleSemUpdate);
+    return () => {
+      window.removeEventListener("storage", handleSemUpdate);
+      window.removeEventListener("quizzy_semester_updated", handleSemUpdate);
+    };
+  }, []);
+
   // Real-time live study time state synced from database + active engagement
   const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(displayName || undefined);
 
@@ -72,6 +85,7 @@ export function DashboardPage() {
   function handleSemesterChange(sem: number) {
     setSelectedSemester(sem);
     localStorage.setItem("quizzy_student_sem", String(sem));
+    window.dispatchEvent(new Event("quizzy_semester_updated"));
     setIsEditingSem(false);
   }
 
