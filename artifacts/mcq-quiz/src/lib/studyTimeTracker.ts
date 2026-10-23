@@ -59,6 +59,23 @@ export function getStudyTimeMap(): DayData {
   }
 }
 
+const timeListeners = new Set<() => void>();
+
+export function subscribeStudyTime(fn: () => void) {
+  timeListeners.add(fn);
+  return () => {
+    timeListeners.delete(fn);
+  };
+}
+
+function notifyTimeListeners() {
+  timeListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {}
+  });
+}
+
 export function addStudyMinutes(minutes: number) {
   if (typeof window === "undefined" || minutes <= 0) return;
   try {
@@ -66,6 +83,42 @@ export function addStudyMinutes(minutes: number) {
     const today = getTodayStr();
     map[today] = Math.round((map[today] || 0) + minutes);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    notifyTimeListeners();
+    window.dispatchEvent(new Event("quizzy_study_time_updated"));
+  } catch {}
+}
+
+/**
+ * Synchronizes past exam study time from PostgreSQL database
+ */
+export async function syncStudyTimeFromDatabase(userName?: string): Promise<void> {
+  if (
+    typeof window === "undefined" ||
+    !userName ||
+    !userName.trim() ||
+    userName.trim().toLowerCase() === "guest scholar"
+  ) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/quiz-reports/study-time?userName=${encodeURIComponent(userName)}`);
+    if (!res.ok) return;
+    const dbTimes = (await res.json()) as Record<string, number>;
+    if (!dbTimes || typeof dbTimes !== "object") return;
+
+    const map = getStudyTimeMap();
+    let changed = false;
+    for (const [dateStr, mins] of Object.entries(dbTimes)) {
+      if ((map[dateStr] || 0) < mins) {
+        map[dateStr] = mins;
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+      notifyTimeListeners();
+      window.dispatchEvent(new Event("quizzy_study_time_updated"));
+    }
   } catch {}
 }
 
@@ -74,6 +127,39 @@ export function recordQuizSeconds(seconds: number) {
   // Convert seconds to minutes, minimum 1 minute if at least 20 seconds were spent
   const minutes = Math.max(seconds >= 20 ? 1 : 0, Math.round(seconds / 60));
   addStudyMinutes(minutes);
+}
+
+export function useWeeklyStudyTimeData(userName?: string) {
+  const [data, setData] = useState(() => ({
+    weekly: getWeeklyStudyTime(),
+    total: getTotalStudyMinutes(),
+  }));
+
+  useEffect(() => {
+    if (userName) {
+      syncStudyTimeFromDatabase(userName);
+    }
+  }, [userName]);
+
+  useEffect(() => {
+    const update = () => {
+      setData({
+        weekly: getWeeklyStudyTime(),
+        total: getTotalStudyMinutes(),
+      });
+    };
+    const unsubscribe = subscribeStudyTime(update);
+    window.addEventListener("storage", update);
+    window.addEventListener("quizzy_study_time_updated", update);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", update);
+      window.removeEventListener("quizzy_study_time_updated", update);
+    };
+  }, []);
+
+  return data;
 }
 
 export function getWeeklyStudyTime(): { day: string; fullDate: string; minutes: number; hours: number }[] {

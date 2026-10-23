@@ -191,6 +191,35 @@ router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
   res.json(buildAnalytics(targetResolved, reports));
 });
 
+router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
+  const userName = req.query.userName as string;
+  const nameMap = await getUserNameMap();
+  const targetResolved = userName ? resolveName(userName, nameMap) : null;
+  const allReports = await db.select().from(quizReportsTable).orderBy(quizReportsTable.createdAt);
+
+  const reports = allReports.filter((r) => {
+    if (!userName || !userName.trim()) return false;
+    const rResolved = resolveName(r.userName, nameMap);
+    return (
+      r.userName === userName ||
+      rResolved === userName ||
+      r.userName === targetResolved ||
+      rResolved === targetResolved
+    );
+  });
+
+  // Calculate actual daily study minutes from completed exams
+  const dailyMinutes: Record<string, number> = {};
+  for (const r of reports) {
+    const dateStr = r.createdAt.toISOString().slice(0, 10);
+    // Each 10 questions takes ~8-12 minutes of active testing & review
+    const quizMinutes = Math.max(5, Math.round((r.total || 10) * 0.9));
+    dailyMinutes[dateStr] = (dailyMinutes[dateStr] || 0) + quizMinutes;
+  }
+
+  res.json(dailyMinutes);
+});
+
 router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
   if (!userName || !userName.trim() || userName.trim().toLowerCase() === "guest" || userName.trim().toLowerCase() === "guest scholar") {

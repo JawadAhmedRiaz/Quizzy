@@ -18,7 +18,7 @@ import { useUser } from "@/context/UserContext";
 import { TopNavbar } from "@/components/TopNavbar";
 import { Sidebar } from "@/components/Sidebar";
 import { AnimatedAvatar, getSavedAvatarId, saveAvatarId } from "@/components/AnimatedAvatar";
-import { getWeeklyStudyTime, getTotalStudyMinutes } from "@/lib/studyTimeTracker";
+import { useWeeklyStudyTimeData } from "@/lib/studyTimeTracker";
 import { useGetUserAnalytics, getGetUserAnalyticsQueryKey } from "@workspace/api-client-react";
 
 const API = import.meta.env.BASE_URL + "api";
@@ -49,9 +49,8 @@ export function DashboardPage() {
   });
   const [isEditingSem, setIsEditingSem] = useState(false);
 
-  // Study time state
-  const [weeklyStudyTime, setWeeklyStudyTime] = useState(() => getWeeklyStudyTime());
-  const [totalMinutes, setTotalMinutes] = useState(() => getTotalStudyMinutes());
+  // Real-time live study time state synced from database + active engagement
+  const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(displayName || undefined);
 
   // Fetch live analytics
   const myKey = effectiveUserId ?? displayName ?? "";
@@ -364,6 +363,7 @@ export function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                     unit="m"
+                    domain={[0, (dataMax: number) => Math.max(30, Math.ceil(dataMax * 1.15))]}
                   />
                   <Tooltip
                     contentStyle={{
