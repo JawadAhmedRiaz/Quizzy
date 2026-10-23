@@ -77,7 +77,7 @@ export function ResultPage() {
     if (effectiveUserId) {
       const timeTaken = session.timeTaken;
       const timeAllowed = session.timeAllowed;
-      recordQuizSeconds(timeTaken);
+      recordQuizSeconds(timeTaken, name);
       fetch(`${API}/quiz-reports/leaderboard?quizId=${quizId}`)
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])

@@ -62,8 +62,14 @@ export function DashboardPage() {
     };
   }, []);
 
+  // Active student identity for personal metrics
+  const activeUserKey = (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null)
+    || (displayName && displayName !== "Guest Scholar" && displayName !== "User" ? displayName : null)
+    || effectiveUserId
+    || undefined;
+
   // Real-time live study time state synced from database + active engagement
-  const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(displayName || undefined);
+  const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(activeUserKey);
 
   // Fetch live analytics
   const myKey = displayName || effectiveUserId || "";

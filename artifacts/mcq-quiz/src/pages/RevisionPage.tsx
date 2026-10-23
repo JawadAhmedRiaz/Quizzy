@@ -511,14 +511,14 @@ export function RevisionPage() {
                         </div>
                         <div className="p-2.5 rounded-xl bg-card border border-border/80 text-foreground">
                           <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">
-                            💡 Why this answer is correct:
+                            💡 Concept Breakdown:
                           </span>
                           <p className="text-muted-foreground leading-relaxed text-xs font-medium">
                             {currentCard.question.e && currentCard.question.e.trim().length > 0
                               ? currentCard.question.e
                               : `Option (${String.fromCharCode(65 + currentCard.question.a)}) "${
                                   currentCard.question.o[currentCard.question.a]
-                                }" is the verified correct answer based on curriculum rules for ${currentCard.subject}.`}
+                                }" is the verified conceptual answer for ${currentCard.subject}.`}
                           </p>
                         </div>
                       </motion.div>
@@ -594,14 +594,14 @@ export function RevisionPage() {
                     {/* Detailed Explanation / Why It Is Correct */}
                     <div className="rounded-2xl p-3.5 bg-muted/40 border border-border/80 text-xs mb-3">
                       <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">
-                        💡 Why this answer is correct:
+                        💡 Concept Breakdown & Why This Is Correct:
                       </span>
                       <p className="text-muted-foreground leading-relaxed font-medium">
                         {currentCard.question.e && currentCard.question.e.trim().length > 0
                           ? currentCard.question.e
                           : `Option (${String.fromCharCode(65 + currentCard.question.a)}) "${
                               currentCard.question.o[currentCard.question.a]
-                            }" is the verified correct answer for ${currentCard.subject}${
+                            }" directly defines this concept in ${currentCard.subject}${
                               currentCard.question.c ? ` (${currentCard.question.c})` : ""
                             }.`}
                       </p>

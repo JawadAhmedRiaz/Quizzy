@@ -264,6 +264,10 @@ router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
 
   const reports = allReports.filter((r) => {
     if (!userName || !userName.trim()) return false;
+    const cleanUser = userName.trim().toLowerCase();
+    if (cleanUser === "guest scholar" || cleanUser === "guest" || cleanUser === "user") {
+      return false;
+    }
     return matchesUser(r.userName, userName);
   });
 

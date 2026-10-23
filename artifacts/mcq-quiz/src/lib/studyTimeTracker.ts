@@ -1,7 +1,7 @@
 /**
  * Real Study Time Tracker
  * Accurately measures actual active time spent learning and taking quizzes.
- * Zero mock or dummy data.
+ * Scoped strictly per-user so that each student's profile displays only their own study time.
  */
 import { useEffect, useState } from "react";
 
@@ -44,16 +44,25 @@ function getTodayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function getStudyTimeMap(): DayData {
+export function getUserStorageKey(userIdentifier?: string): string {
+  if (!userIdentifier || !userIdentifier.trim()) {
+    const guestId = typeof window !== "undefined" ? localStorage.getItem("quizzy_guest_id") : null;
+    return guestId ? `quizzy_study_time_${guestId}` : "quizzy_study_time_guest";
+  }
+  const clean = userIdentifier.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+  return `quizzy_study_time_${clean}`;
+}
+
+export function getStudyTimeMap(userIdentifier?: string): DayData {
   if (typeof window === "undefined") return {};
   try {
-    // Clear legacy mock seed key if it exists
-    if (localStorage.getItem(OLD_STORAGE_KEY)) {
-      localStorage.removeItem(OLD_STORAGE_KEY);
-    }
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const map: DayData = raw ? JSON.parse(raw) : {};
-    return map;
+    // Purge legacy un-namespaced shared keys so they never leak between users
+    if (localStorage.getItem(STORAGE_KEY)) localStorage.removeItem(STORAGE_KEY);
+    if (localStorage.getItem(OLD_STORAGE_KEY)) localStorage.removeItem(OLD_STORAGE_KEY);
+
+    const key = getUserStorageKey(userIdentifier);
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
@@ -76,76 +85,100 @@ function notifyTimeListeners() {
   });
 }
 
-export function addStudyMinutes(minutes: number) {
+export function addStudyMinutes(minutes: number, userIdentifier?: string) {
   if (typeof window === "undefined" || minutes <= 0) return;
   try {
-    const map = getStudyTimeMap();
+    const key = getUserStorageKey(userIdentifier);
+    const map = getStudyTimeMap(userIdentifier);
     const today = getTodayStr();
     map[today] = Math.round((map[today] || 0) + minutes);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    localStorage.setItem(key, JSON.stringify(map));
     notifyTimeListeners();
     window.dispatchEvent(new Event("quizzy_study_time_updated"));
   } catch {}
 }
 
 /**
- * Synchronizes past exam study time from PostgreSQL database
+ * Synchronizes past exam study time from PostgreSQL database for the specific user.
+ * Replaces any polluted state with the authoritative database record.
  */
-export async function syncStudyTimeFromDatabase(userName?: string): Promise<void> {
+export async function syncStudyTimeFromDatabase(userIdentifier?: string): Promise<DayData | null> {
   if (
     typeof window === "undefined" ||
-    !userName ||
-    !userName.trim() ||
-    userName.trim().toLowerCase() === "guest scholar"
+    !userIdentifier ||
+    !userIdentifier.trim() ||
+    userIdentifier.trim().toLowerCase() === "guest scholar" ||
+    userIdentifier.trim().toLowerCase() === "user"
   ) {
-    return;
+    return null;
   }
   try {
-    const res = await fetch(`/api/quiz-reports/study-time?userName=${encodeURIComponent(userName)}`);
-    if (!res.ok) return;
+    const res = await fetch(`/api/quiz-reports/study-time?userName=${encodeURIComponent(userIdentifier.trim())}`);
+    if (!res.ok) return null;
     const dbTimes = (await res.json()) as Record<string, number>;
-    if (!dbTimes || typeof dbTimes !== "object") return;
+    if (!dbTimes || typeof dbTimes !== "object") return null;
 
-    const map = getStudyTimeMap();
-    let changed = false;
-    for (const [dateStr, mins] of Object.entries(dbTimes)) {
-      if ((map[dateStr] || 0) < mins) {
-        map[dateStr] = mins;
-        changed = true;
-      }
+    const key = getUserStorageKey(userIdentifier);
+    // Ground truth from database for this specific user
+    const userMap: DayData = { ...dbTimes };
+
+    // If this student accumulated active session minutes today, preserve the maximum for today
+    const existingLocal = getStudyTimeMap(userIdentifier);
+    const today = getTodayStr();
+    if (existingLocal[today] && existingLocal[today] > (userMap[today] || 0)) {
+      userMap[today] = existingLocal[today];
     }
-    if (changed) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-      notifyTimeListeners();
-      window.dispatchEvent(new Event("quizzy_study_time_updated"));
-    }
-  } catch {}
+
+    localStorage.setItem(key, JSON.stringify(userMap));
+    notifyTimeListeners();
+    window.dispatchEvent(new Event("quizzy_study_time_updated"));
+    return userMap;
+  } catch {
+    return null;
+  }
 }
 
-export function recordQuizSeconds(seconds: number) {
+export function recordQuizSeconds(seconds: number, userIdentifier?: string) {
   if (seconds <= 0) return;
   // Convert seconds to minutes, minimum 1 minute if at least 20 seconds were spent
   const minutes = Math.max(seconds >= 20 ? 1 : 0, Math.round(seconds / 60));
-  addStudyMinutes(minutes);
+  addStudyMinutes(minutes, userIdentifier);
 }
 
-export function useWeeklyStudyTimeData(userName?: string) {
+export function useWeeklyStudyTimeData(userIdentifier?: string) {
   const [data, setData] = useState(() => ({
-    weekly: getWeeklyStudyTime(),
-    total: getTotalStudyMinutes(),
+    weekly: getWeeklyStudyTime(userIdentifier),
+    total: getTotalStudyMinutes(userIdentifier),
   }));
 
+  // When userIdentifier changes or loads, immediately switch to their dataset and sync
   useEffect(() => {
-    if (userName) {
-      syncStudyTimeFromDatabase(userName);
+    setData({
+      weekly: getWeeklyStudyTime(userIdentifier),
+      total: getTotalStudyMinutes(userIdentifier),
+    });
+
+    if (
+      userIdentifier &&
+      userIdentifier.trim().toLowerCase() !== "guest scholar" &&
+      userIdentifier.trim().toLowerCase() !== "user"
+    ) {
+      syncStudyTimeFromDatabase(userIdentifier).then((syncedMap) => {
+        if (syncedMap) {
+          setData({
+            weekly: getWeeklyStudyTime(userIdentifier),
+            total: getTotalStudyMinutes(userIdentifier),
+          });
+        }
+      });
     }
-  }, [userName]);
+  }, [userIdentifier]);
 
   useEffect(() => {
     const update = () => {
       setData({
-        weekly: getWeeklyStudyTime(),
-        total: getTotalStudyMinutes(),
+        weekly: getWeeklyStudyTime(userIdentifier),
+        total: getTotalStudyMinutes(userIdentifier),
       });
     };
     const unsubscribe = subscribeStudyTime(update);
@@ -157,13 +190,13 @@ export function useWeeklyStudyTimeData(userName?: string) {
       window.removeEventListener("storage", update);
       window.removeEventListener("quizzy_study_time_updated", update);
     };
-  }, []);
+  }, [userIdentifier]);
 
   return data;
 }
 
-export function getWeeklyStudyTime(): { day: string; fullDate: string; minutes: number; hours: number }[] {
-  const map = getStudyTimeMap();
+export function getWeeklyStudyTime(userIdentifier?: string): { day: string; fullDate: string; minutes: number; hours: number }[] {
+  const map = getStudyTimeMap(userIdentifier);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const result = [];
   const today = new Date();
@@ -186,8 +219,8 @@ export function getWeeklyStudyTime(): { day: string; fullDate: string; minutes: 
   return result;
 }
 
-export function getTotalStudyMinutes(): number {
-  const map = getStudyTimeMap();
+export function getTotalStudyMinutes(userIdentifier?: string): number {
+  const map = getStudyTimeMap(userIdentifier);
   return Object.values(map).reduce((sum, m) => sum + (Number(m) || 0), 0);
 }
 
@@ -195,31 +228,28 @@ export function getTotalStudyMinutes(): number {
  * Hook to automatically track real active engagement time while the student is browsing/studying.
  * Pauses automatically when tab is hidden, backgrounded, or when the user enters the Break Zone.
  */
-export function useRealStudyTracker() {
+export function useRealStudyTracker(userIdentifier?: string) {
   useEffect(() => {
     let accumulatedSeconds = 0;
     const interval = setInterval(() => {
-      // Check if user is currently in the Break Zone
       const isBreak =
         typeof window !== "undefined" &&
         (window.location.pathname.startsWith("/break") ||
           window.location.hash.includes("/break"));
 
-      // Only count if active, tab is visible, not on Break page, and tracker is not paused
       if (
         document.visibilityState === "visible" &&
         !isBreak &&
         !isTrackerPaused
       ) {
         accumulatedSeconds += 15;
-        // Save every 60 seconds (1 real minute)
         if (accumulatedSeconds >= 60) {
-          addStudyMinutes(1);
+          addStudyMinutes(1, userIdentifier);
           accumulatedSeconds = 0;
         }
       }
     }, 15000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [userIdentifier]);
 }

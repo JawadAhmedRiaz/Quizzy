@@ -10,6 +10,7 @@ import adminRouter from "./admin";
 import subjectsRouter from "./subjects";
 import feedbacksRouter from "./feedbacks";
 import vaultRouter from "./vault";
+import aiRouter from "./ai";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(adminRouter);
 router.use(subjectsRouter);
 router.use(feedbacksRouter);
 router.use(vaultRouter);
+router.use(aiRouter);
 
 export default router;
