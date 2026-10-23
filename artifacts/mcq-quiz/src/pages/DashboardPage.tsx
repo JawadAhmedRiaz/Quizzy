@@ -596,7 +596,7 @@ export function DashboardPage() {
                 </h3>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
-                {weakSubjects.length} Topics
+                {weakSubjects.length} {weakSubjects.length === 1 ? "Subject" : "Subjects"}
               </span>
             </div>
 
@@ -605,50 +605,57 @@ export function DashboardPage() {
                 <div className="text-center py-6">
                   <span className="text-3xl block mb-2">🎉</span>
                   <p className="text-sm font-bold text-foreground">Outstanding Work!</p>
-                  <p className="text-xs text-muted-foreground">All your tested subjects are above 70% accuracy.</p>
+                  <p className="text-xs text-muted-foreground">All your tested subjects are above 75% accuracy.</p>
                 </div>
               ) : (
-                weakSubjects.map((s) => (
-                  <div
-                    key={s.name}
-                    className="p-3.5 rounded-2xl flex items-center justify-between gap-4 transition-all hover:scale-[1.01]"
-                    style={{
-                      background: "rgba(239, 68, 68, 0.06)",
-                      border: "1px solid rgba(239, 68, 68, 0.2)",
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold text-foreground truncate">{s.name}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-400">
-                          Needs Practice
+                weakSubjects.map((s) => {
+                  const isModerate = s.pct >= 60;
+                  return (
+                    <div
+                      key={s.name}
+                      className="p-3.5 rounded-2xl flex items-center justify-between gap-4 transition-all hover:scale-[1.01]"
+                      style={{
+                        background: isModerate ? "rgba(245, 158, 11, 0.06)" : "rgba(239, 68, 68, 0.06)",
+                        border: `1px solid ${isModerate ? "rgba(245, 158, 11, 0.25)" : "rgba(239, 68, 68, 0.2)"}`,
+                      }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground truncate">{s.name}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            isModerate
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-rose-500/20 text-rose-600 dark:text-rose-400"
+                          }`}>
+                            {isModerate ? "Moderate (60-74%)" : "Needs Practice"}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${isModerate ? "bg-amber-500" : "bg-rose-500"}`}
+                            style={{ width: `${s.pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground mt-1 block">
+                          Target: Bring up to 75%+
                         </span>
                       </div>
-                      <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-rose-500 rounded-full"
-                          style={{ width: `${s.pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground mt-1 block">
-                        Target: Bring up to 75%+
-                      </span>
-                    </div>
 
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      <span className="text-lg font-black text-rose-600 dark:text-rose-400">
-                        {s.pct}%
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/study")}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 shadow transition-all hover:scale-105"
-                      >
-                        🎯 Practice
-                      </button>
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <span className={`text-lg font-black ${isModerate ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"}`}>
+                          {s.pct}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/study")}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 shadow transition-all hover:scale-105 cursor-pointer"
+                        >
+                          🎯 Practice
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

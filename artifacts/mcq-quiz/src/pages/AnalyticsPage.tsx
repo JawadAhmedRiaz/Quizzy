@@ -68,10 +68,18 @@ export function AnalyticsPage() {
     { query: { enabled: !!compare1 && !!compare2, queryKey: getCompareUsersQueryKey({ user1: compare1, user2: compare2 }) } }
   );
 
-  const subjectChartData = myAnalytics?.bySubject.map((s) => ({
-    name: s.subject.replace(/-/g, " "),
-    avgPct: Math.round(s.avgPct),
-  })) ?? [];
+  const subjectChartData = myAnalytics?.bySubject.map((s) => {
+    let name = s.subject.replace(/-/g, " ").trim();
+    if (/^programing$/i.test(name) || /^programming$/i.test(name)) {
+      name = "Programming";
+    } else {
+      name = name.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    return {
+      name,
+      avgPct: Math.round(s.avgPct),
+    };
+  }) ?? [];
 
   const pieData = myAnalytics ? [
     { name: "Correct", value: Math.round(myAnalytics.avgPct) },
@@ -231,11 +239,11 @@ export function AnalyticsPage() {
                   {subjectChartData.length > 0 && (
                     <div className="glow-card p-4">
                       <p className="text-sm font-bold mb-3">Performance by Subject</p>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <BarChart data={subjectChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                          <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                          <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} domain={[0, 100]} />
-                          <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={subjectChartData} margin={{ top: 10, right: 10, left: -10, bottom: 25 }}>
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} height={25} />
+                          <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" />
+                          <Tooltip formatter={(v: number) => [`${v}%`, "Avg %"]} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }} />
                           <Bar dataKey="avgPct" fill="#6366f1" radius={[4, 4, 0, 0]} name="Avg %" />
                         </BarChart>
                       </ResponsiveContainer>
