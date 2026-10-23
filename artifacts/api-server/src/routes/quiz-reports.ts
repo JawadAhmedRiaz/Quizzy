@@ -295,7 +295,7 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
                 q: qText,
                 o: options,
                 a: correctIndex,
-                e: dbMatch?.explanation || "Review the core concepts for this question.",
+                e: dbMatch?.briefing || dbMatch?.explanation || "Review the core concepts for this question.",
               },
               selectedOptionIndex: typeof ans.selected === "number" ? ans.selected : null,
               wrongAt: report.createdAt.toISOString(),
