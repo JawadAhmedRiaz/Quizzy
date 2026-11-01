@@ -481,7 +481,7 @@ export function WelcomeModal({ show, onDismiss, onLogin, onContinueAsGuest }: Pr
                     className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
                     style={primaryBtnStyle}
                   >
-                    {socialLoading ? "Connecting…" : `Sign in with ${socialProvider} →`}
+                    {socialLoading ? "Connecting…" : "Sign in with Google →"}
                   </button>
                 </div>
 

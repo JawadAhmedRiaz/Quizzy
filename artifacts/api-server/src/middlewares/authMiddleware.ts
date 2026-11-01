@@ -23,15 +23,19 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction,
 ) {
-  const sid = getSessionId(req);
-  if (sid) {
-    const session = await getSession(sid);
-    if (session) {
-      req.user = session.user;
-      req.isAuthenticated = () => true;
-      next();
-      return;
+  try {
+    const sid = getSessionId(req);
+    if (sid) {
+      const session = await getSession(sid);
+      if (session) {
+        req.user = session.user;
+        req.isAuthenticated = () => true;
+        next();
+        return;
+      }
     }
+  } catch (err) {
+    req.log?.error?.({ err }, "authMiddleware error during session lookup");
   }
   req.isAuthenticated = () => false;
   next();

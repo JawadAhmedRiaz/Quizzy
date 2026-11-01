@@ -10,7 +10,20 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const isCloudOrProd =
+  process.env.NODE_ENV === "production" ||
+  process.env.DATABASE_URL?.includes("supabase") ||
+  process.env.DATABASE_URL?.includes("pooler");
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: isCloudOrProd ? { rejectUnauthorized: false } : undefined,
+});
+
+pool.on("error", (err) => {
+  console.error("Postgres connection pool error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

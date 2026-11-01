@@ -623,7 +623,15 @@ export function QuizPage() {
             </div>
 
             <AnimatePresence>
-              {(displayShowExpl || displayAnswered || isReviewMode) && (
+              {(displayShowExpl || displayAnswered || isReviewMode) && (() => {
+                const currentOpts = shuffleCache.current.get(`${mode}-${idx}-${displayQ.q.slice(0, 15)}`) ??
+                  (isReviewMode && reviewEntry
+                    ? (shuffleCache.current.get(`${reviewEntry.mode}-${reviewEntry.idx}-${displayQ.q.slice(0, 15)}`) ?? displayQ.o.map((o, i) => ({ o, i })))
+                    : displayQ.o.map((o, i) => ({ o, i })));
+                const correctPos = currentOpts.findIndex((item) => item.i === displayQ.a);
+                const correctLabel = correctPos >= 0 ? LABELS[correctPos] : LABELS[displayQ.a];
+
+                return (
                 <motion.div
                   initial={{ opacity: 0, y: 8, height: 0 }}
                   animate={{ opacity: 1, y: 0, height: "auto" }}
@@ -682,7 +690,7 @@ export function QuizPage() {
                     <div className="text-xs font-bold text-emerald-500 flex items-center gap-1">
                       <span>✓ Correct Option:</span>
                       <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                        {LABELS[displayQ.a]}
+                        {correctLabel}
                       </span>
                     </div>
                   </div>
@@ -691,17 +699,18 @@ export function QuizPage() {
                   <div className="rounded-xl p-3.5 bg-muted/60 border border-border/80 text-foreground flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 font-bold text-xs text-blue-500 dark:text-blue-400">
                       <span>💡</span>
-                      <span>Concept Breakdown (Option {LABELS[displayQ.a]}):</span>
+                      <span>Concept Breakdown (Option {correctLabel}):</span>
                     </div>
 
                     <p className="text-xs leading-relaxed text-foreground/90 font-medium whitespace-pre-line">
                       {displayQ.e && displayQ.e.trim().length > 0
                         ? displayQ.e
-                        : `Option (${LABELS[displayQ.a]}) "${displayQ.o[displayQ.a]}" is the correct concept answering "${displayQ.q}".`}
+                        : `Option (${correctLabel}) "${displayQ.o[displayQ.a]}" is the correct concept answering "${displayQ.q}".`}
                     </p>
                   </div>
                 </motion.div>
-              )}
+                );
+              })()}
             </AnimatePresence>
           </motion.div>
         </AnimatePresence>
