@@ -14,6 +14,7 @@ export const quizReportsTable = pgTable("quiz_reports", {
   pct: integer("pct").notNull(),
   score: integer("score").notNull(),
   answersJson: text("answers_json").notNull().default("[]"),
+  durationSeconds: integer("duration_seconds"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

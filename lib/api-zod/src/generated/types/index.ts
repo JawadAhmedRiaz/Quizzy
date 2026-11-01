@@ -26,5 +26,6 @@ export * from "./quizReport";
 export * from "./quizUserEntry";
 export * from "./semStat";
 export * from "./subjectStat";
-
+export * from "./submitQuizReportBody";
+export * from "./submitScoreBody";
 export * from "./userAnalytics";

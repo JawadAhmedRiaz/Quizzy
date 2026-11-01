@@ -51,7 +51,36 @@ export function HomePage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { effectiveUserId, profile, isAdmin } = useUser();
   const settings = useSettings();
-  const [selectedSem, setSelectedSem] = useState(1);
+  const [selectedSem, setSelectedSem] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("quizzy_student_sem");
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) return parsed;
+      }
+    }
+    return 1;
+  });
+
+  // Keep in sync with user's selected semester
+  useEffect(() => {
+    const handleSemUpdate = () => {
+      const saved = localStorage.getItem("quizzy_student_sem");
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) {
+          setSelectedSem(parsed);
+          setSelectedSubject(null);
+        }
+      }
+    };
+    window.addEventListener("quizzy_semester_updated", handleSemUpdate);
+    window.addEventListener("storage", handleSemUpdate);
+    return () => {
+      window.removeEventListener("quizzy_semester_updated", handleSemUpdate);
+      window.removeEventListener("storage", handleSemUpdate);
+    };
+  }, []);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [attemptedMap, setAttemptedMap] = useState<Record<string, boolean>>({});
@@ -150,6 +179,8 @@ export function HomePage() {
   function changeSem(sem: number) {
     setSelectedSem(sem);
     setSelectedSubject(null);
+    localStorage.setItem("quizzy_student_sem", String(sem));
+    window.dispatchEvent(new Event("quizzy_semester_updated"));
   }
 
   function getSubjectBubbleCount(subj: Subject): number {

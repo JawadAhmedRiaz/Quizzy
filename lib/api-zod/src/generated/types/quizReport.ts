@@ -17,5 +17,6 @@ export interface QuizReport {
   total: number;
   pct: number;
   score: number;
+  durationSeconds?: number;
   createdAt: string;
 }

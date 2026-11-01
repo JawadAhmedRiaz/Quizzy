@@ -1,15 +1,28 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API = import.meta.env.BASE_URL + "api";
 
 const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8];
-const EXAM_TYPES = ["Midterm", "Final", "Quiz", "Assignment"];
+const DEFAULT_FALLBACK_EXAM_TYPES = ["Midterm", "Final", "Quiz", "Assignment"];
+
+function parseExamTypes(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch {}
+  }
+  return [];
+}
 
 interface SubjectOption {
   id: number;
   name: string;
+  sem?: number;
+  examTypes?: string[] | string;
 }
 
 interface ParsedQuestion {
@@ -34,6 +47,8 @@ export function ImportPage() {
   const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [examType, setExamType] = useState("Midterm");
+  const [isCustomExamType, setIsCustomExamType] = useState(false);
+  const [customExamTypeInput, setCustomExamTypeInput] = useState("");
   const [rawText, setRawText] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [mode, setMode] = useState<"extract" | "generate">("extract");
@@ -54,15 +69,51 @@ export function ImportPage() {
   useEffect(() => {
     setSubjectsLoading(true);
     setSubject("");
+    setIsCustomExamType(false);
+    setCustomExamTypeInput("");
     fetch(`${API}/subjects?sem=${sem}`)
       .then(r => r.ok ? r.json() : [])
       .then((data: SubjectOption[]) => {
         setSubjectOptions(data);
-        if (data.length > 0) setSubject(data[0].name);
+        if (data.length > 0) {
+          const first = data[0];
+          setSubject(first.name);
+          const types = parseExamTypes(first.examTypes);
+          setExamType(types.length > 0 ? types[0] : "Midterm");
+        } else {
+          setExamType("Midterm");
+        }
       })
-      .catch(() => setSubjectOptions([]))
+      .catch(() => {
+        setSubjectOptions([]);
+        setExamType("Midterm");
+      })
       .finally(() => setSubjectsLoading(false));
   }, [sem]);
+
+  function handleSubjectChange(newSubName: string) {
+    setSubject(newSubName);
+    setIsCustomExamType(false);
+    setCustomExamTypeInput("");
+    const subObj = subjectOptions.find(s => s.name === newSubName);
+    const types = subObj ? parseExamTypes(subObj.examTypes) : [];
+    setExamType(types.length > 0 ? types[0] : "Midterm");
+  }
+
+  const selectedSubjectObj = useMemo(
+    () => subjectOptions.find(s => s.name === subject),
+    [subjectOptions, subject]
+  );
+
+  const configuredExamTypes = useMemo(
+    () => (selectedSubjectObj ? parseExamTypes(selectedSubjectObj.examTypes) : []),
+    [selectedSubjectObj]
+  );
+
+  const availableExamTypes = useMemo(
+    () => (configuredExamTypes.length > 0 ? configuredExamTypes : DEFAULT_FALLBACK_EXAM_TYPES),
+    [configuredExamTypes]
+  );
 
   const inputStyle = {
     background: "#0f172a",
@@ -91,7 +142,14 @@ export function ImportPage() {
       const r = await fetch(`${API}/admin/extract-file`, { method: "POST", body: formData });
       const data = await r.json();
       if (r.ok) {
-        setRawText(data.text as string);
+        const extracted = (data.text as string) || "";
+        if (!extracted.trim()) {
+          setError("No readable text found in this file. It appears to be a scanned document or slide image without a selectable text layer. Please copy & paste the text directly into the text box below.");
+          setFileName(null);
+          setRawText("");
+        } else {
+          setRawText(extracted);
+        }
       } else {
         setError((data as { error?: string }).error ?? "File extraction failed");
         setFileName(null);
@@ -258,7 +316,7 @@ export function ImportPage() {
                     {subjectsLoading && <span className="ml-1.5 text-[10px]" style={{ color: "#64748b" }}>loading…</span>}
                   </label>
                   {subjectOptions.length > 0 ? (
-                    <select value={subject} onChange={e => setSubject(e.target.value)} style={selectStyle}>
+                    <select value={subject} onChange={e => handleSubjectChange(e.target.value)} style={selectStyle}>
                       {subjectOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   ) : (
@@ -274,10 +332,67 @@ export function ImportPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "#94a3b8" }}>Exam Phase</label>
-                  <select value={examType} onChange={e => setExamType(e.target.value)} style={selectStyle}>
-                    {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold" style={{ color: "#94a3b8" }}>
+                      Exam Phase / Type
+                    </label>
+                    {configuredExamTypes.length > 0 && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        From Settings
+                      </span>
+                    )}
+                  </div>
+
+                  {!isCustomExamType ? (
+                    <select
+                      value={availableExamTypes.includes(examType) ? examType : "__custom__"}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === "__custom__") {
+                          setIsCustomExamType(true);
+                          setCustomExamTypeInput("");
+                        } else {
+                          setExamType(val);
+                        }
+                      }}
+                      style={selectStyle}
+                    >
+                      {availableExamTypes.map(e => (
+                        <option key={e} value={e}>{e}</option>
+                      ))}
+                      <option value="__custom__">+ Enter custom exam type...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={customExamTypeInput}
+                        onChange={e => {
+                          setCustomExamTypeInput(e.target.value);
+                          setExamType(e.target.value || "Midterm");
+                        }}
+                        placeholder="e.g. Quiz 2, Prelim..."
+                        style={{ ...inputStyle, padding: "7px 10px" }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomExamType(false);
+                          setExamType(availableExamTypes[0] || "Midterm");
+                        }}
+                        className="px-2.5 py-1 text-xs rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        title="Cancel custom exam type"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  )}
+                  {configuredExamTypes.length === 0 && !isCustomExamType && subjectOptions.length > 0 && (
+                    <p className="text-[10px] mt-1 text-slate-500">
+                      Using default exam types (none configured in Content Settings).
+                    </p>
+                  )}
                 </div>
               </div>
 

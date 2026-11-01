@@ -39,6 +39,7 @@ export interface QuizReport {
   total: number;
   pct: number;
   score: number;
+  durationSeconds?: number;
   createdAt: string;
 }
 
@@ -53,6 +54,7 @@ export interface SubmitQuizReportBody {
   pct: number;
   score: number;
   answersJson: string;
+  durationSeconds?: number;
 }
 
 export interface QuizLeaderboardEntry {

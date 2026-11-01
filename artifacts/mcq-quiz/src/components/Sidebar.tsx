@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
+import { renderAvatarSvg, getSavedAvatarId } from "@/components/AnimatedAvatar";
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -18,6 +19,18 @@ export function Sidebar({ open, onClose }: Props) {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, login, logout } = useAuth();
   const { effectiveUserId, profile, gamification, displayName, profileComplete, isAdmin } = useUser();
+
+  const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
+
+  useEffect(() => {
+    const handleAvatarUpdate = () => setAvatarId(getSavedAvatarId());
+    window.addEventListener("quizzy_avatar_updated", handleAvatarUpdate);
+    window.addEventListener("storage", handleAvatarUpdate);
+    return () => {
+      window.removeEventListener("quizzy_avatar_updated", handleAvatarUpdate);
+      window.removeEventListener("storage", handleAvatarUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -67,14 +80,9 @@ export function Sidebar({ open, onClose }: Props) {
                   {isAuthenticated && user ? (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
-                        {user.profileImageUrl ? (
-                          <img src={user.profileImageUrl} alt="" className="w-10 h-10 rounded-full object-cover" style={{ border: "2px solid rgba(99,102,241,0.5)" }} />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-                            style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff" }}>
-                            {(displayName[0] ?? "U").toUpperCase()}
-                          </div>
-                        )}
+                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-blue-500/60 bg-[#0B132B] shrink-0">
+                          {renderAvatarSvg(avatarId, 40)}
+                        </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold truncate">{displayName}</p>
                           {profile?.rollNumber && <p className="text-xs truncate" style={{ color: "#a78bfa" }}>{profile.rollNumber}</p>}
@@ -97,8 +105,9 @@ export function Sidebar({ open, onClose }: Props) {
                   ) : (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-                          style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", color: "#1a1a2e" }}>👤</div>
+                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-amber-500/60 bg-[#0B132B] shrink-0">
+                          {renderAvatarSvg(avatarId, 40)}
+                        </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold">{displayName}</p>
                           <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>Guest · {effectiveUserId?.slice(0, 14) ?? "..."}</p>

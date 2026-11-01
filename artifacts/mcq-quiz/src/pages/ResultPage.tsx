@@ -51,6 +51,9 @@ export function ResultPage() {
     recordMistakesFromQuiz(quizId!, meta.subject, answers, meta.sem, meta.examType);
 
     const name = displayName || playerName || "Student";
+    const timeTaken = session.timeTaken;
+    const timeAllowed = session.timeAllowed;
+
     submitReport.mutate({
       data: {
         userName: name,
@@ -62,6 +65,7 @@ export function ResultPage() {
         total,
         pct,
         score,
+        durationSeconds: timeTaken != null && timeTaken > 0 ? timeTaken : undefined,
         answersJson: JSON.stringify(
           answers.map((a) => ({
             q: a.question.q, c: a.question.c,
@@ -75,9 +79,9 @@ export function ResultPage() {
     });
 
     if (effectiveUserId) {
-      const timeTaken = session.timeTaken;
-      const timeAllowed = session.timeAllowed;
-      recordQuizSeconds(timeTaken, name);
+      if (timeTaken != null && timeTaken > 0) {
+        recordQuizSeconds(timeTaken, name);
+      }
       fetch(`${API}/quiz-reports/leaderboard?quizId=${quizId}`)
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])

@@ -88,35 +88,6 @@ export function QuizPage() {
   const [flagReason, setFlagReason] = useState("");
   const [flagNote, setFlagNote] = useState("");
 
-  // AI Deep Dive explanations
-  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
-  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
-
-  async function handleRequestAiExplanation(q: Question) {
-    const key = q.q.trim();
-    if (aiLoading[key]) return;
-    setAiLoading((prev) => ({ ...prev, [key]: true }));
-    try {
-      const res = await fetch(`${API}/ai/explain`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: q.q,
-          options: q.o,
-          correctAnswer: LABELS[q.a],
-          subject: meta?.subject,
-          topic: q.c,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.explanation) {
-          setAiExplanations((prev) => ({ ...prev, [key]: data.explanation }));
-        }
-      }
-    } catch {}
-    setAiLoading((prev) => ({ ...prev, [key]: false }));
-  }
 
   // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -718,32 +689,15 @@ export function QuizPage() {
 
                   {/* Why it is correct feedback */}
                   <div className="rounded-xl p-3.5 bg-muted/60 border border-border/80 text-foreground flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 font-bold text-xs text-blue-500 dark:text-blue-400">
-                        <span>💡</span>
-                        <span>Concept Breakdown (Option {LABELS[displayQ.a]}):</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRequestAiExplanation(displayQ)}
-                        disabled={aiLoading[displayQ.q.trim()]}
-                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer hover:scale-[1.02] active:scale-95"
-                        style={{
-                          background: "rgba(99,102,241,0.15)",
-                          borderColor: "rgba(99,102,241,0.35)",
-                          color: "#818cf8",
-                        }}
-                        title="Get an in-depth AI explanation of this concept"
-                      >
-                        <span>{aiLoading[displayQ.q.trim()] ? "⏳ Analyzing..." : "✨ AI Deep Dive"}</span>
-                      </button>
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-blue-500 dark:text-blue-400">
+                      <span>💡</span>
+                      <span>Concept Breakdown (Option {LABELS[displayQ.a]}):</span>
                     </div>
 
                     <p className="text-xs leading-relaxed text-foreground/90 font-medium whitespace-pre-line">
-                      {aiExplanations[displayQ.q.trim()] ||
-                        (displayQ.e && displayQ.e.trim().length > 0
-                          ? displayQ.e
-                          : `Option (${LABELS[displayQ.a]}) "${displayQ.o[displayQ.a]}" is the correct concept answering "${displayQ.q}".`)}
+                      {displayQ.e && displayQ.e.trim().length > 0
+                        ? displayQ.e
+                        : `Option (${LABELS[displayQ.a]}) "${displayQ.o[displayQ.a]}" is the correct concept answering "${displayQ.q}".`}
                     </p>
                   </div>
                 </motion.div>

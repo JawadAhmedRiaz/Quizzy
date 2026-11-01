@@ -77,10 +77,17 @@ function MaintenanceOverlay() {
 }
 
 function AppInner() {
-  useRealStudyTracker();
+  const { effectiveUserId, displayName, profile, isGuest, refreshProfile } = useUser();
+  const activeUserKey = !isGuest ? (
+    (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null)
+    || (displayName && displayName !== "Guest Scholar" && displayName !== "User" ? displayName : null)
+    || effectiveUserId
+    || undefined
+  ) : undefined;
+
+  useRealStudyTracker(activeUserKey);
   const [location] = useLocation();
   const { isAuthenticated, isLoading: authLoading, isAuthModalOpen, closeAuthModal } = useAuth();
-  const { refreshProfile } = useUser();
   const [splashVisible, setSplashVisible] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [guestContinued, setGuestContinued] = useState(() => !!localStorage.getItem("quizzy_guest_continued"));

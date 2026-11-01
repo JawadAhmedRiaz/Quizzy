@@ -259,6 +259,7 @@ router.get("/quiz-reports/analytics", async (req, res): Promise<void> => {
 
 router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
   const userName = req.query.userName as string;
+  const timeZone = (req.query.timeZone as string) || "Asia/Karachi";
   const { matchesUser } = await getUserIdentities();
   const allReports = await db.select().from(quizReportsTable).orderBy(quizReportsTable.createdAt);
 
@@ -271,12 +272,27 @@ router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
     return matchesUser(r.userName, userName);
   });
 
-  // Calculate actual daily study minutes from completed exams
+  // Aggregate verified study minutes strictly from recorded duration
   const dailyMinutes: Record<string, number> = {};
   for (const r of reports) {
-    const dateStr = r.createdAt.toISOString().slice(0, 10);
-    // Each 10 questions takes ~8-12 minutes of active testing & review
-    const quizMinutes = Math.max(5, Math.round((r.total || 10) * 0.9));
+    // Only count genuine recorded time — never guess or invent synthetic durations
+    if (r.durationSeconds == null || r.durationSeconds <= 0) {
+      continue;
+    }
+
+    let dateStr: string;
+    try {
+      dateStr = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(r.createdAt);
+    } catch {
+      dateStr = r.createdAt.toISOString().slice(0, 10);
+    }
+
+    const quizMinutes = Math.max(1, Math.round(r.durationSeconds / 60));
     dailyMinutes[dateStr] = (dailyMinutes[dateStr] || 0) + quizMinutes;
   }
 

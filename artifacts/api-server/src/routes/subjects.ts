@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, ilike } from "drizzle-orm";
 import { db, subjectsTable, questionsTable, semestersTable, systemConfigsTable } from "@workspace/db";
 import { autoGenerateMissingBriefings } from "../lib/explanationService";
 
@@ -91,6 +91,8 @@ router.get("/quiz-questions/:quizId", async (req, res): Promise<void> => {
     return;
   }
 
+  const decodedExamType = decodeURIComponent(examTypeRaw).trim();
+
   const questions = await db
     .select()
     .from(questionsTable)
@@ -98,7 +100,7 @@ router.get("/quiz-questions/:quizId", async (req, res): Promise<void> => {
       and(
         eq(questionsTable.sem, subject.sem),
         eq(questionsTable.subject, subject.name),
-        eq(questionsTable.examType, examTypeRaw.charAt(0).toUpperCase() + examTypeRaw.slice(1)),
+        ilike(questionsTable.examType, decodedExamType),
       ),
     );
 

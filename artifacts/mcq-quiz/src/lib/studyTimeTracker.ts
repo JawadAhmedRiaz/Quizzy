@@ -3,7 +3,7 @@
  * Accurately measures actual active time spent learning and taking quizzes.
  * Scoped strictly per-user so that each student's profile displays only their own study time.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const STORAGE_KEY = "quizzy_real_study_time_by_day";
 const OLD_STORAGE_KEY = "quizzy_study_time_by_day";
@@ -17,8 +17,11 @@ export function setStudyTrackerPaused(paused: boolean) {
 }
 
 export function getStudyTrackerPaused(): boolean {
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/break")) {
-    return true;
+  if (typeof window !== "undefined") {
+    const p = window.location.pathname;
+    if (p.startsWith("/break") || p.startsWith("/quiz")) {
+      return true;
+    }
   }
   return isTrackerPaused;
 }
@@ -35,13 +38,33 @@ export function useStudyTrackerPaused(): boolean {
   return paused;
 }
 
+export function getClientTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Karachi";
+  } catch {
+    return "Asia/Karachi";
+  }
+}
+
+export function getDateStringForTimezone(d: Date, tz = getClientTimeZone()): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+}
+
 interface DayData {
   [dateStr: string]: number; // date "YYYY-MM-DD" -> real minutes
 }
 
 function getTodayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return getDateStringForTimezone(new Date());
 }
 
 export function getUserStorageKey(userIdentifier?: string): string {
@@ -99,8 +122,8 @@ export function addStudyMinutes(minutes: number, userIdentifier?: string) {
 }
 
 /**
- * Synchronizes past exam study time from PostgreSQL database for the specific user.
- * Replaces any polluted state with the authoritative database record.
+ * Synchronizes verified past exam study time from PostgreSQL database for the specific user.
+ * Reconciles server recorded exam time with local active browsing without blind destructive replacement.
  */
 export async function syncStudyTimeFromDatabase(userIdentifier?: string): Promise<DayData | null> {
   if (
@@ -113,20 +136,23 @@ export async function syncStudyTimeFromDatabase(userIdentifier?: string): Promis
     return null;
   }
   try {
-    const res = await fetch(`/api/quiz-reports/study-time?userName=${encodeURIComponent(userIdentifier.trim())}`);
+    const tz = getClientTimeZone();
+    const res = await fetch(
+      `/api/quiz-reports/study-time?userName=${encodeURIComponent(userIdentifier.trim())}&timeZone=${encodeURIComponent(tz)}`
+    );
     if (!res.ok) return null;
     const dbTimes = (await res.json()) as Record<string, number>;
     if (!dbTimes || typeof dbTimes !== "object") return null;
 
     const key = getUserStorageKey(userIdentifier);
-    // Ground truth from database for this specific user
-    const userMap: DayData = { ...dbTimes };
-
-    // If this student accumulated active session minutes today, preserve the maximum for today
     const existingLocal = getStudyTimeMap(userIdentifier);
-    const today = getTodayStr();
-    if (existingLocal[today] && existingLocal[today] > (userMap[today] || 0)) {
-      userMap[today] = existingLocal[today];
+
+    // Reconcile: merge server exam time with local browsing time safely
+    const userMap: DayData = { ...existingLocal };
+    for (const [dateStr, dbMins] of Object.entries(dbTimes)) {
+      if (typeof dbMins === "number" && dbMins > 0) {
+        userMap[dateStr] = Math.max(userMap[dateStr] || 0, dbMins);
+      }
     }
 
     localStorage.setItem(key, JSON.stringify(userMap));
@@ -199,14 +225,14 @@ export function getWeeklyStudyTime(userIdentifier?: string): { day: string; full
   const map = getStudyTimeMap(userIdentifier);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const result = [];
-  const today = new Date();
+  const now = new Date();
+  const tz = getClientTimeZone();
 
-  // Last 7 days in chronological order
+  // Last 7 days in chronological order up to Today in the user's timezone
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const dayLabel = i === 0 ? "Today" : dayNames[d.getDay()];
+    const target = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = getDateStringForTimezone(target, tz);
+    const dayLabel = i === 0 ? "Today" : dayNames[target.getDay()];
     const mins = map[dateStr] || 0;
     result.push({
       day: dayLabel,
@@ -226,21 +252,60 @@ export function getTotalStudyMinutes(userIdentifier?: string): number {
 
 /**
  * Hook to automatically track real active engagement time while the student is browsing/studying.
- * Pauses automatically when tab is hidden, backgrounded, or when the user enters the Break Zone.
+ * Features:
+ * 1. Automatically pauses when tab is hidden or backgrounded.
+ * 2. 2-minute inactivity timeout (user activity resets idle timer).
+ * 3. Excludes `/break` and `/quiz` routes (quiz time is measured directly on completion to prevent double counting).
+ * 4. Multi-tab coordination via leader heartbeat so multiple open tabs do not inflate time.
  */
 export function useRealStudyTracker(userIdentifier?: string) {
+  const tabIdRef = useRef<string>("");
+  if (!tabIdRef.current) {
+    tabIdRef.current = "tab_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+
   useEffect(() => {
+    const tabId = tabIdRef.current;
     let accumulatedSeconds = 0;
+    let lastActivityTime = Date.now();
+
+    const onUserActivity = () => {
+      lastActivityTime = Date.now();
+    };
+
+    const activityEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    activityEvents.forEach((ev) => window.addEventListener(ev, onUserActivity, { passive: true }));
+
+    const LEADER_KEY = "quizzy_study_tracker_leader_tab";
+    const HEARTBEAT_KEY = "quizzy_study_tracker_leader_ts";
+
     const interval = setInterval(() => {
-      const isBreak =
-        typeof window !== "undefined" &&
-        (window.location.pathname.startsWith("/break") ||
-          window.location.hash.includes("/break"));
+      const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+      const isExcluded = pathname.startsWith("/break") || pathname.startsWith("/quiz");
+
+      // Inactivity timeout: 2 minutes (120,000ms)
+      const isIdle = Date.now() - lastActivityTime > 120_000;
+
+      // Tab coordination: only 1 tab acts as leader to prevent multi-tab multiplication
+      const now = Date.now();
+      const currentLeader = localStorage.getItem(LEADER_KEY);
+      const lastHeartbeat = Number(localStorage.getItem(HEARTBEAT_KEY) || 0);
+      const isLeaderDead = now - lastHeartbeat > 25_000;
+      const isLeader = currentLeader === tabId || isLeaderDead || !currentLeader;
+
+      if (isLeader) {
+        localStorage.setItem(LEADER_KEY, tabId);
+        localStorage.setItem(HEARTBEAT_KEY, String(now));
+      } else {
+        // Another active tab is tracking time; do not double count in this tab
+        return;
+      }
 
       if (
         document.visibilityState === "visible" &&
-        !isBreak &&
-        !isTrackerPaused
+        !isExcluded &&
+        !isTrackerPaused &&
+        !isIdle
       ) {
         accumulatedSeconds += 15;
         if (accumulatedSeconds >= 60) {
@@ -250,6 +315,12 @@ export function useRealStudyTracker(userIdentifier?: string) {
       }
     }, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      activityEvents.forEach((ev) => window.removeEventListener(ev, onUserActivity));
+      if (localStorage.getItem(LEADER_KEY) === tabId) {
+        localStorage.removeItem(LEADER_KEY);
+      }
+    };
   }, [userIdentifier]);
 }

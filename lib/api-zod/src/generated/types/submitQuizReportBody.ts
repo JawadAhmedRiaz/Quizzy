@@ -17,4 +17,5 @@ export interface SubmitQuizReportBody {
   pct: number;
   score: number;
   answersJson: string;
+  durationSeconds?: number;
 }

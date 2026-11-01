@@ -3,6 +3,35 @@ import type { Question } from "@/data/questions";
 import type { QuizAnswer } from "@/context/QuizContext";
 
 const STORAGE_KEY = "quizzy_revision_mistakes_v1";
+const DELETED_STORAGE_KEY = "quizzy_revision_deleted_v1";
+
+export function getDeletedMistakeKeys(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveDeletedMistakeKey(key: string) {
+  if (typeof window === "undefined" || !key) return;
+  try {
+    const current = getDeletedMistakeKeys();
+    current.add(key.trim().toLowerCase());
+    localStorage.setItem(DELETED_STORAGE_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
+
+export function unmarkDeletedMistakeKey(key: string) {
+  if (typeof window === "undefined" || !key) return;
+  try {
+    const current = getDeletedMistakeKeys();
+    current.delete(key.trim().toLowerCase());
+    localStorage.setItem(DELETED_STORAGE_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
 
 export interface MistakeRecord {
   id: string;
@@ -84,6 +113,7 @@ export function recordMistakesFromQuiz(
   answers.forEach((ans) => {
     // Only capture incorrect answers (exclude skipped or correct)
     if (!ans.isCorrect && !ans.skipped && ans.question) {
+      unmarkDeletedMistakeKey(ans.question.q);
       const id = generateId(quizId, ans.question.q);
       const existing = currentMap.get(id);
 
@@ -137,12 +167,19 @@ export function markMistakeMastered(id: string, mastered: boolean = true) {
 
 export function deleteMistake(id: string) {
   const current = getAllMistakes();
+  const toDelete = current.find((m) => m.id === id);
+  if (toDelete?.question?.q) {
+    saveDeletedMistakeKey(toDelete.question.q);
+  }
   const updated = current.filter((m) => m.id !== id);
   saveMistakes(updated);
 }
 
 export function clearAllMasteredMistakes() {
   const current = getAllMistakes();
+  current.filter((m) => m.mastered).forEach((m) => {
+    if (m.question?.q) saveDeletedMistakeKey(m.question.q);
+  });
   const updated = current.filter((m) => !m.mastered);
   saveMistakes(updated);
 }
@@ -167,6 +204,7 @@ export async function syncMistakesFromDatabase(userName?: string): Promise<Mista
     const dbMistakes: MistakeRecord[] = await res.json();
     if (!Array.isArray(dbMistakes) || dbMistakes.length === 0) return getAllMistakes();
 
+    const deletedKeys = getDeletedMistakeKeys();
     const localMistakes = getAllMistakes();
     const localMap = new Map(localMistakes.map((m) => [m.question?.q?.trim().toLowerCase(), m]));
 
@@ -175,6 +213,9 @@ export async function syncMistakesFromDatabase(userName?: string): Promise<Mista
     // Process all DB mistakes
     dbMistakes.forEach((dbM) => {
       const qKey = dbM.question?.q?.trim().toLowerCase();
+      if (qKey && deletedKeys.has(qKey)) {
+        return; // Skip user-deleted questions
+      }
       const localMatch = localMap.get(qKey);
 
       if (localMatch) {

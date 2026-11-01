@@ -70,6 +70,7 @@ export function DashboardPage() {
 
   // Real-time live study time state synced from database + active engagement
   const { weekly: weeklyStudyTime, total: totalMinutes } = useWeeklyStudyTimeData(activeUserKey);
+  const past7DaysMinutes = useMemo(() => weeklyStudyTime.reduce((acc, d) => acc + (d.minutes || 0), 0), [weeklyStudyTime]);
 
   // Fetch live analytics
   const myKey = displayName || effectiveUserId || "";
@@ -98,6 +99,7 @@ export function DashboardPage() {
   function handleAvatarChange(newId: string) {
     setAvatarId(newId);
     saveAvatarId(newId);
+    window.dispatchEvent(new Event("quizzy_avatar_updated"));
   }
 
   // XP & Gamification details
@@ -408,7 +410,7 @@ export function DashboardPage() {
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-border/50 text-xs text-muted-foreground mt-2">
-              <span>Total Active Study: <strong className="text-foreground">{totalMinutes} mins</strong></span>
+              <span>Past 7 Days: <strong className="text-foreground">{past7DaysMinutes} mins</strong> <span className="text-[11px] opacity-70">({totalMinutes} mins all-time)</span></span>
               <span>Streak Health: <strong className="text-emerald-500">100% On Track</strong></span>
             </div>
           </div>

@@ -128,6 +128,14 @@ export function RevisionPage() {
     }
   };
 
+  const handleDeleteMistake = (id: string) => {
+    deleteMistake(id);
+    const updated = getAllMistakes();
+    setMistakes(updated);
+    setIsFlipped(false);
+    setCardIndex((prev) => Math.max(0, Math.min(prev, updated.length - 1)));
+  };
+
   // Keyboard navigation for flashcards
   useEffect(() => {
     if (viewMode !== "flashcards" || filteredMistakes.length === 0) return;
@@ -516,12 +524,21 @@ export function RevisionPage() {
 
                   {/* Actions on Back */}
                   <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-3">
-                    <button
-                      onClick={handleNext}
-                      className="px-4 py-2 rounded-xl text-xs font-bold border border-border bg-muted/40 hover:bg-muted text-foreground transition-all cursor-pointer"
-                    >
-                      Keep Reviewing
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleNext}
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-border bg-muted/40 hover:bg-muted text-foreground transition-all cursor-pointer"
+                      >
+                        Keep Reviewing
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMistake(currentCard.id)}
+                        className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 border border-border/60 transition-all cursor-pointer"
+                        title="Remove from Revision Deck"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => handleToggleMastered(currentCard.id, currentCard.mastered)}
@@ -646,7 +663,7 @@ export function RevisionPage() {
                   </button>
 
                   <button
-                    onClick={() => deleteMistake(record.id)}
+                    onClick={() => handleDeleteMistake(record.id)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Remove from Revision"
                   >

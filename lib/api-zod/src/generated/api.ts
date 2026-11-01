@@ -65,6 +65,7 @@ export const SubmitQuizReportBody = zod.object({
   pct: zod.number(),
   score: zod.number(),
   answersJson: zod.string(),
+  durationSeconds: zod.number().optional(),
 });
 
 /**

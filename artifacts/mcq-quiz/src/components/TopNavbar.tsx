@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
 import { useSettings } from "@/context/SettingsContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useRevisionStats, syncMistakesFromDatabase } from "@/lib/revisionTracker";
+import { renderAvatarSvg, getSavedAvatarId } from "@/components/AnimatedAvatar";
 
 interface Props {
   onOpenSidebar?: () => void;
@@ -25,6 +26,19 @@ export function TopNavbar(_props: Props = {}) {
   const revisionStats = useRevisionStats();
 
   const avatarInitial = (displayName?.[0] ?? "U").toUpperCase();
+  const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
+
+  useEffect(() => {
+    const handleAvatarUpdate = () => {
+      setAvatarId(getSavedAvatarId());
+    };
+    window.addEventListener("quizzy_avatar_updated", handleAvatarUpdate);
+    window.addEventListener("storage", handleAvatarUpdate);
+    return () => {
+      window.removeEventListener("quizzy_avatar_updated", handleAvatarUpdate);
+      window.removeEventListener("storage", handleAvatarUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     syncMistakesFromDatabase(displayName || undefined);
@@ -227,22 +241,9 @@ export function TopNavbar(_props: Props = {}) {
           className="flex items-center justify-center p-0.5 rounded-full transition-transform hover:scale-105 active:scale-95 group"
           title={`My Profile (${displayName || "Student"})`}
         >
-          {isAuthenticated && user?.profileImageUrl ? (
-            <img
-              src={user.profileImageUrl}
-              alt={displayName}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-blue-500/70 group-hover:ring-blue-600 transition-all shadow-xs"
-            />
-          ) : (
-            <div
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-black text-sm text-white shadow-xs ring-2 ring-blue-500/70 group-hover:ring-blue-600 transition-all cursor-pointer"
-              style={{
-                background: "linear-gradient(135deg, #007aff, #2563eb)",
-              }}
-            >
-              {avatarInitial}
-            </div>
-          )}
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-blue-500/70 group-hover:ring-blue-600 transition-all shadow-xs cursor-pointer bg-[#0B132B]">
+            {renderAvatarSvg(avatarId, 36)}
+          </div>
         </Link>
       </div>
     </header>
