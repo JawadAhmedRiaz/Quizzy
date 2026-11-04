@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@workspace/api-client-react": "workspace:*"
   },
   "peerDependencies": {

@@ -377,84 +377,9 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   res.json({ user: sessionData.user });
 });
 
-router.post("/auth/google", async (req: Request, res: Response) => {
-  const { credential, email: directEmail, firstName: directFirstName, lastName: directLastName, profileImageUrl: directPhoto } = req.body ?? {};
-
-  let email = directEmail;
-  let firstName = directFirstName;
-  let lastName = directLastName;
-  let profileImageUrl = directPhoto;
-
-  if (credential && typeof credential === "string") {
-    try {
-      const gRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-      if (gRes.ok) {
-        const gData = await gRes.json() as { email?: string; given_name?: string; family_name?: string; picture?: string; name?: string };
-        if (gData.email) {
-          email = gData.email;
-          firstName = gData.given_name || (gData.name ? gData.name.split(" ")[0] : "Google");
-          lastName = gData.family_name || (gData.name ? gData.name.split(" ").slice(1).join(" ") : "Student");
-          profileImageUrl = gData.picture || null;
-        }
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  if (!email) {
-    res.status(400).json({ error: "Valid email is required from Google sign-in" });
-    return;
-  }
-
-  const [existing] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, email))
-    .limit(1);
-
-  let user = existing;
-  if (!user) {
-    const [created] = await db
-      .insert(usersTable)
-      .values({
-        email,
-        firstName: firstName || "Google",
-        lastName: lastName || "User",
-        profileImageUrl: profileImageUrl || null,
-        role: "student",
-      })
-      .returning();
-    user = created;
-  } else if (profileImageUrl && !user.profileImageUrl) {
-    await db
-      .update(usersTable)
-      .set({ profileImageUrl })
-      .where(eq(usersTable.id, user.id));
-    user.profileImageUrl = profileImageUrl;
-  }
-
-  const sessionData: SessionData = {
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      profileImageUrl: user.profileImageUrl,
-    },
-  };
-
-  const sid = await createSession(sessionData);
-
-  res.cookie(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_TTL,
-  });
-
-  res.json({ user: sessionData.user });
+// Google Cloud Console OAuth endpoint deprecated in favor of Clerk Authentication
+router.post("/auth/google", async (_req: Request, res: Response) => {
+  res.status(410).json({ error: "Google OAuth via Google Cloud Console has been retired. Please use Clerk sign-in." });
 });
 
 router.post("/auth/apple", async (req: Request, res: Response) => {

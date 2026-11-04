@@ -42,12 +42,11 @@ interface UserContextValue {
   profileComplete: boolean;
 }
 
-function generateGuestId(): string {
-  const existing = localStorage.getItem("quizzy_guest_id");
-  if (existing) return existing;
-  const id = "guest_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  localStorage.setItem("quizzy_guest_id", id);
-  return id;
+function getStoredGuestId(): string | null {
+  if (typeof window === "undefined") return null;
+  // ONLY return guest ID if guest mode was explicitly chosen
+  if (!localStorage.getItem("quizzy_guest_continued")) return null;
+  return localStorage.getItem("quizzy_guest_id");
 }
 
 function getGuestDisplayName(): string | null {
@@ -66,45 +65,68 @@ const UserContext = createContext<UserContextValue | null>(null);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [guestId] = useState<string>(() => generateGuestId());
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [gamification, setGamification] = useState<GamificationData | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [guestId, setGuestId] = useState<string | null>(() => getStoredGuestId());
 
-  const effectiveUserId: string | null = isLoading ? null :
-    isAuthenticated && user ? (user.id ?? user.email ?? null) :
-    guestId;
-  const isGuest = !isAuthenticated;
+  // Listen for explicit guest activation or logout events
+  useEffect(() => {
+    const handleGuestChange = () => {
+      setGuestId(getStoredGuestId());
+    };
+    window.addEventListener("quizzy_profile_updated", handleGuestChange);
+    window.addEventListener("storage", handleGuestChange);
+    return () => {
+      window.removeEventListener("quizzy_profile_updated", handleGuestChange);
+      window.removeEventListener("storage", handleGuestChange);
+    };
+  }, []);
+
+  // Effective user ID is strictly null if signed out and no explicit guest mode chosen
+  const effectiveUserId: string | null = isLoading
+    ? null
+    : isAuthenticated && user
+    ? (user.id ?? user.email ?? null)
+    : guestId;
+
+  const isGuest = !isAuthenticated && !!guestId;
 
   useEffect(() => {
-    if (!isAuthenticated || isLoading) { setIsAdmin(false); return; }
+    if (!isAuthenticated || isLoading) {
+      setIsAdmin(false);
+      return;
+    }
     fetch(`${API}/admin/check`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : { isAdmin: false })
-      .then(d => setIsAdmin(d.isAdmin === true))
+      .then((r) => (r.ok ? r.json() : { isAdmin: false }))
+      .then((d) => setIsAdmin(d.isAdmin === true))
       .catch(() => setIsAdmin(false));
   }, [isAuthenticated, isLoading]);
 
   const refreshProfile = useCallback(async () => {
-    if (!effectiveUserId) return;
+    if (!effectiveUserId) {
+      setProfile(null);
+      setProfileLoaded(true);
+      return;
+    }
     try {
       const r = await fetch(`${API}/profile/${effectiveUserId}`);
       if (r.ok) {
         const data = await r.json();
         if (data) {
           setProfile(data);
-        } else {
-          const guestName = isGuest ? getGuestDisplayName() : null;
-          const guestGender = isGuest ? getGuestGender() : null;
-          const authName = isAuthenticated && user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || null : null;
+        } else if (isGuest) {
+          const guestName = getGuestDisplayName();
+          const guestGender = getGuestGender();
           const created = await fetch(`${API}/profile`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               userId: effectiveUserId,
-              displayName: guestName ?? authName,
+              displayName: guestName,
               gender: guestGender,
-              isGuest: !isAuthenticated,
+              isGuest: true,
             }),
           });
           if (created.ok) setProfile(await created.json());
@@ -112,35 +134,41 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
     setProfileLoaded(true);
-  }, [effectiveUserId, isAuthenticated, user]);
+  }, [effectiveUserId, isGuest]);
 
   const refreshGamification = useCallback(async () => {
-    if (!effectiveUserId) return;
+    if (!effectiveUserId) {
+      setGamification(null);
+      return;
+    }
     try {
       const r = await fetch(`${API}/gamification/${effectiveUserId}`);
       if (r.ok) setGamification(await r.json());
     } catch {}
   }, [effectiveUserId]);
 
-  const saveProfile = useCallback(async (data: Partial<UserProfile>): Promise<{ ok: boolean; error?: string }> => {
-    if (!effectiveUserId) return { ok: false, error: "No user session" };
-    try {
-      const r = await fetch(`${API}/profile`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: effectiveUserId, ...data }),
-      });
-      if (r.ok) {
-        setProfile(await r.json());
-        return { ok: true };
-      } else {
-        const errJson = await r.json().catch(() => ({}));
-        return { ok: false, error: errJson.error || "Failed to save profile" };
+  const saveProfile = useCallback(
+    async (data: Partial<UserProfile>): Promise<{ ok: boolean; error?: string }> => {
+      if (!effectiveUserId) return { ok: false, error: "No user session" };
+      try {
+        const r = await fetch(`${API}/profile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: effectiveUserId, ...data }),
+        });
+        if (r.ok) {
+          setProfile(await r.json());
+          return { ok: true };
+        } else {
+          const errJson = await r.json().catch(() => ({}));
+          return { ok: false, error: errJson.error || "Failed to save profile" };
+        }
+      } catch (e: any) {
+        return { ok: false, error: e?.message || "Failed to save profile" };
       }
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Failed to save profile" };
-    }
-  }, [effectiveUserId]);
+    },
+    [effectiveUserId],
+  );
 
   const [guestVersion, setGuestVersion] = useState(0);
 
@@ -161,12 +189,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (effectiveUserId) {
       refreshProfile();
       refreshGamification();
+    } else {
+      setProfile(null);
+      setGamification(null);
     }
   }, [effectiveUserId, guestVersion]);
 
-  const authDisplayName = isAuthenticated && user
-    ? ([user.firstName, user.lastName].filter(Boolean).join(" ").trim() || null)
-    : null;
+  const authDisplayName =
+    isAuthenticated && user
+      ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || null
+      : null;
 
   const currentGuestName = isGuest ? getGuestDisplayName() : null;
 
@@ -179,14 +211,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
     profileDisplayName ||
     authDisplayName ||
     currentGuestName ||
-    (isGuest ? "Guest Scholar" : "User");
+    (isGuest ? "Guest Scholar" : "Student");
 
   const profileComplete = !!(
-    profile?.displayName && profile?.rollNumber && profile?.department && profile?.section && profile?.gender
+    profile?.displayName &&
+    profile?.rollNumber &&
+    profile?.department &&
+    profile?.section &&
+    profile?.gender
   );
 
   return (
-    <UserContext.Provider value={{ effectiveUserId, isGuest, isAdmin, profile, gamification, refreshProfile, refreshGamification, saveProfile, displayName, profileComplete }}>
+    <UserContext.Provider
+      value={{
+        effectiveUserId,
+        isGuest,
+        isAdmin,
+        profile,
+        gamification,
+        refreshProfile,
+        refreshGamification,
+        saveProfile,
+        displayName,
+        profileComplete,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );

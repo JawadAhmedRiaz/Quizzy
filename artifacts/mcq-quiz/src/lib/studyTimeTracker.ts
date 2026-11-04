@@ -79,13 +79,50 @@ export function getUserStorageKey(userIdentifier?: string): string {
 export function getStudyTimeMap(userIdentifier?: string): DayData {
   if (typeof window === "undefined") return {};
   try {
-    // Purge legacy un-namespaced shared keys so they never leak between users
-    if (localStorage.getItem(STORAGE_KEY)) localStorage.removeItem(STORAGE_KEY);
-    if (localStorage.getItem(OLD_STORAGE_KEY)) localStorage.removeItem(OLD_STORAGE_KEY);
-
     const key = getUserStorageKey(userIdentifier);
+    let map: DayData = {};
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : {};
+    if (raw) {
+      try {
+        map = JSON.parse(raw);
+      } catch {}
+    }
+
+    // One-time safe migration from legacy keys if active user has no data or to merge existing local records
+    const migrationMarker = `quizzy_study_migrated_${key}`;
+    if (!localStorage.getItem(migrationMarker)) {
+      let migratedAny = false;
+      const legacyKeys = [
+        "quizzy_real_study_time_by_day",
+        "quizzy_study_time_by_day",
+        "quizzy_study_time_7bc565fe-9339-44b3-bb19-275a88785ae2",
+      ];
+
+      for (const lk of legacyKeys) {
+        const lRaw = localStorage.getItem(lk);
+        if (lRaw) {
+          try {
+            const lMap = JSON.parse(lRaw);
+            if (lMap && typeof lMap === "object") {
+              for (const [d, mins] of Object.entries(lMap)) {
+                const num = Number(mins);
+                if (typeof num === "number" && num > 0) {
+                  map[d] = Math.max(map[d] || 0, num);
+                  migratedAny = true;
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+
+      localStorage.setItem(migrationMarker, "1");
+      if (migratedAny) {
+        localStorage.setItem(key, JSON.stringify(map));
+      }
+    }
+
+    return map;
   } catch {
     return {};
   }

@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { clerkMiddleware } from "@clerk/express";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
@@ -36,6 +37,14 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+if (process.env.CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY) {
+  app.use(
+    clerkMiddleware({
+      publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+      secretKey: process.env.CLERK_SECRET_KEY,
+    }),
+  );
+}
 app.use(authMiddleware);
 
 app.use("/api", router);

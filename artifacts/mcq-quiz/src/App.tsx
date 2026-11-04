@@ -12,6 +12,7 @@ import { ProfileCompletionPrompt } from "@/components/ProfileCompletionPrompt";
 import { SplashScreen } from "@/components/SplashScreen";
 import { TopProgressBar } from "@/components/TopProgressBar";
 import { useRealStudyTracker } from "@/lib/studyTimeTracker";
+import { LoginPage } from "@/pages/LoginPage";
 import { HomePage } from "@/pages/HomePage";
 import { QuizSetupPage } from "@/pages/QuizSetupPage";
 import { QuizPage } from "@/pages/QuizPage";
@@ -43,8 +44,6 @@ function MaintenanceOverlay() {
   const { isAuthenticated, openAuthModal, logout } = useAuth();
   const settings = useSettings();
 
-  // Maintenance screen only blocks non-admin users AFTER they have logged in!
-  // Logged-out users must be able to log in (especially admins).
   if (!settings.maintenanceEnabled || isAdmin || !isAuthenticated) return null;
 
   return (
@@ -78,19 +77,19 @@ function MaintenanceOverlay() {
 
 function AppInner() {
   const { effectiveUserId, displayName, profile, isGuest, refreshProfile } = useUser();
-  const activeUserKey = !isGuest ? (
-    (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null)
-    || (displayName && displayName !== "Guest Scholar" && displayName !== "User" ? displayName : null)
-    || effectiveUserId
-    || undefined
-  ) : undefined;
+  const { isAuthenticated, isLoading: authLoading, isAuthModalOpen, closeAuthModal } = useAuth();
+
+  const activeUserKey = !isGuest && effectiveUserId
+    ? (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null)
+      || (displayName && displayName !== "Guest Scholar" && displayName !== "User" ? displayName : null)
+      || effectiveUserId
+      || undefined
+    : undefined;
 
   useRealStudyTracker(activeUserKey);
   const [location] = useLocation();
-  const { isAuthenticated, isLoading: authLoading, isAuthModalOpen, closeAuthModal } = useAuth();
   const [splashVisible, setSplashVisible] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [guestContinued, setGuestContinued] = useState(() => !!localStorage.getItem("quizzy_guest_continued"));
 
   // Track the last non-admin page so returning from admin restores the exact page
   useEffect(() => {
@@ -99,21 +98,9 @@ function AppInner() {
     }
   }, [location]);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (isAuthenticated) { setShowWelcome(false); return; }
-    if (guestContinued) { setShowWelcome(false); return; }
-    const dismissed = localStorage.getItem("welcomeDismissed");
-    if (!dismissed) setShowWelcome(true);
-  }, [authLoading, isAuthenticated, guestContinued]);
-
-  function handleDismiss() {
-    localStorage.setItem("welcomeDismissed", "1");
-    setShowWelcome(false);
-    closeAuthModal();
-  }
-
   async function handleContinueAsGuest(firstName: string, surname: string, gender: string) {
+    const id = "guest_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem("quizzy_guest_id", id);
     localStorage.setItem("quizzy_guest_firstname", firstName);
     localStorage.setItem("quizzy_guest_surname", surname);
     localStorage.setItem("quizzy_guest_gender", gender);
@@ -121,22 +108,54 @@ function AppInner() {
     localStorage.setItem("welcomeDismissed", "1");
     setShowWelcome(false);
     closeAuthModal();
-    setGuestContinued(true);
 
-    const guestId = localStorage.getItem("quizzy_guest_id");
-    if (guestId) {
-      try {
-        await fetch(`${API}/profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: guestId, displayName: `${firstName} ${surname}`, gender, isGuest: true }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch(`${API}/profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: id, displayName: `${firstName} ${surname}`, gender, isGuest: true }),
+      });
+    } catch {}
+
     await refreshProfile();
     window.dispatchEvent(new Event("quizzy_profile_updated"));
   }
 
+  // 1. Loading state while Clerk initializes
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0f19]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-3 border-blue-500 border-t-transparent animate-spin" />
+          <span className="text-xs text-slate-400 font-medium">Loading Quizzy...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. If signed out and no explicit guest mode active, render Login Page
+  const isAuthorized = isAuthenticated || isGuest;
+  if (!isAuthorized) {
+    return (
+      <>
+        <LoginPage onContinueAsGuest={handleContinueAsGuest} />
+        <WelcomeModal
+          show={showWelcome || isAuthModalOpen}
+          onDismiss={() => {
+            setShowWelcome(false);
+            closeAuthModal();
+          }}
+          onLogin={() => {
+            setShowWelcome(false);
+            closeAuthModal();
+          }}
+          onContinueAsGuest={handleContinueAsGuest}
+        />
+      </>
+    );
+  }
+
+  // 3. Authenticated or explicit guest session: render app
   return (
     <>
       <AnimatePresence>
@@ -189,7 +208,10 @@ function AppInner() {
         </Switch>
         <WelcomeModal
           show={(!splashVisible && showWelcome) || isAuthModalOpen}
-          onDismiss={handleDismiss}
+          onDismiss={() => {
+            setShowWelcome(false);
+            closeAuthModal();
+          }}
           onLogin={() => {
             setShowWelcome(false);
             closeAuthModal();

@@ -30,7 +30,7 @@ async function getUserIdentities() {
   for (const u of users) {
     const prof = profileByUserId.get(u.id);
     const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-    const canonicalName = prof?.displayName?.trim() || fullName || (u.email ? u.email.split("@")[0] : "Student");
+    const canonicalName = prof?.displayName?.trim() || (u.email ? u.email.split("@")[0] : fullName || "Student");
 
     const aliases = new Set<string>();
     aliases.add(u.id.toLowerCase());
@@ -38,9 +38,7 @@ async function getUserIdentities() {
       aliases.add(u.email.toLowerCase());
       aliases.add(u.email.split("@")[0].toLowerCase());
     }
-    if (fullName) {
-      aliases.add(fullName.toLowerCase());
-    }
+    // Only bind displayName to this user's aliases if it belongs strictly to this user's profile
     if (prof?.displayName && prof.displayName.trim()) {
       aliases.add(prof.displayName.trim().toLowerCase());
     }
@@ -55,7 +53,9 @@ async function getUserIdentities() {
 
     nameMap.set(u.id, canonicalName);
     if (u.email) nameMap.set(u.email, canonicalName);
-    if (fullName) nameMap.set(fullName, canonicalName);
+    if (prof?.displayName && prof.displayName.trim()) {
+      nameMap.set(prof.displayName.trim(), canonicalName);
+    }
   }
 
   // Also handle profiles that might not have a usersTable row (e.g. guests who set their profile name)

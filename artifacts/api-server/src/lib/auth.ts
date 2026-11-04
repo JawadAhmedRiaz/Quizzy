@@ -26,17 +26,22 @@ export async function createSession(data: SessionData): Promise<string> {
 }
 
 export async function getSession(sid: string): Promise<SessionData | null> {
-  const [row] = await db
-    .select()
-    .from(sessionsTable)
-    .where(eq(sessionsTable.sid, sid));
+  try {
+    const [row] = await db
+      .select()
+      .from(sessionsTable)
+      .where(eq(sessionsTable.sid, sid));
 
-  if (!row || row.expire < new Date()) {
-    if (row) await deleteSession(sid);
+    if (!row || row.expire < new Date()) {
+      if (row) await deleteSession(sid).catch(() => {});
+      return null;
+    }
+
+    return row.sess as unknown as SessionData;
+  } catch (err) {
+    console.error("Failed to query session from database:", err);
     return null;
   }
-
-  return row.sess as unknown as SessionData;
 }
 
 export async function updateSession(
