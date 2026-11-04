@@ -40,7 +40,7 @@ export function LoginPage({ onContinueAsGuest }: Props) {
             }}
           >
             <span>🔐</span>
-            <span>Sign In with Clerk</span>
+            <span>Sign In</span>
             <span>→</span>
           </button>
 
