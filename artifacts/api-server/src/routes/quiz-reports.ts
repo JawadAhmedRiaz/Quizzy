@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, max, count } from "drizzle-orm";
-import { db, quizReportsTable, profilesTable, usersTable, questionsTable } from "@workspace/db";
+import { db, quizReportsTable, profilesTable, usersTable, questionsTable, attemptedQuestionsTable } from "@workspace/db";
 import { SubmitQuizReportBody } from "@workspace/api-zod";
 import type { QuizReport } from "@workspace/db";
 
@@ -310,6 +310,33 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
 
   const userReports = allReports.filter((r) => matchesUser(r.userName, userName));
 
+  // Load server-side dismissed mistake keys for this user
+  let dismissedKeys = new Set<string>();
+  try {
+    const users = await db.select().from(usersTable);
+    const matchedUser = users.find((u) =>
+      matchesUser(u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : "", userName) ||
+      matchesUser(u.email || "", userName)
+    );
+    if (matchedUser) {
+      const [dismissed] = await db
+        .select()
+        .from(attemptedQuestionsTable)
+        .where(eq(attemptedQuestionsTable.userId, matchedUser.id))
+        .limit(1);
+      // We store dismissed keys in a special row with quizId = "revision_dismissed"
+      const dismissedRow = await db
+        .select()
+        .from(attemptedQuestionsTable)
+        .where(eq(attemptedQuestionsTable.quizId, `revision_dismissed_${matchedUser.id}`))
+        .limit(1);
+      if (dismissedRow[0]?.questionHashes) {
+        const keys: string[] = JSON.parse(dismissedRow[0].questionHashes);
+        dismissedKeys = new Set(keys.map((k) => k.trim().toLowerCase()));
+      }
+    }
+  } catch {}
+
   // Cache questionsTable to look up full question text, options, and explanations
   let allDbQuestions: any[] = [];
   try {
@@ -332,6 +359,9 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
         if (!ans.isCorrect && !ans.skipped && ans.q) {
           const qText = String(ans.q).trim();
           const qKey = `${report.subject || "General"}::${qText.toLowerCase()}`;
+
+          // Skip server-side dismissed mistakes
+          if (dismissedKeys.has(qText.trim().toLowerCase())) continue;
 
           if (!mistakesMap.has(qKey)) {
             const dbMatch = qMap.get(qText.toLowerCase());
@@ -379,6 +409,52 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
   }
 
   res.json(Array.from(mistakesMap.values()));
+});
+
+// Persist dismissed mistake keys server-side so deletions survive across devices/incognito
+router.delete("/quiz-reports/mistakes", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const { questionText } = req.body as { questionText?: string };
+  if (!questionText || !questionText.trim()) {
+    res.status(400).json({ error: "questionText is required" });
+    return;
+  }
+
+  const userId = req.user!.id;
+  const dismissKey = `revision_dismissed_${userId}`;
+  const qKey = questionText.trim().toLowerCase();
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(attemptedQuestionsTable)
+      .where(eq(attemptedQuestionsTable.quizId, dismissKey))
+      .limit(1);
+
+    if (existing) {
+      const keys: string[] = JSON.parse(existing.questionHashes || "[]");
+      if (!keys.includes(qKey)) {
+        keys.push(qKey);
+        await db
+          .update(attemptedQuestionsTable)
+          .set({ questionHashes: JSON.stringify(keys) })
+          .where(eq(attemptedQuestionsTable.quizId, dismissKey));
+      }
+    } else {
+      await db.insert(attemptedQuestionsTable).values({
+        userId,
+        quizId: dismissKey,
+        questionHashes: JSON.stringify([qKey]),
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to dismiss mistake" });
+  }
 });
 
 router.get("/quiz-reports/compare", async (req, res): Promise<void> => {

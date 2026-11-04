@@ -170,6 +170,13 @@ export function deleteMistake(id: string) {
   const toDelete = current.find((m) => m.id === id);
   if (toDelete?.question?.q) {
     saveDeletedMistakeKey(toDelete.question.q);
+    // Also persist server-side so deletion survives across devices/incognito
+    fetch("/api/quiz-reports/mistakes", {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionText: toDelete.question.q }),
+    }).catch(() => {}); // fire-and-forget, localStorage is the immediate source of truth
   }
   const updated = current.filter((m) => m.id !== id);
   saveMistakes(updated);
