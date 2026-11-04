@@ -66,9 +66,6 @@ export function LoginPage({ onContinueAsGuest }: Props) {
           </button>
         </div>
 
-        <p className="text-[11px] text-center text-slate-500">
-          Secured by Clerk Authentication
-        </p>
       </motion.div>
     </div>
   );
