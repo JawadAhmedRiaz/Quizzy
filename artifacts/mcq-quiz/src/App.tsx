@@ -10,6 +10,7 @@ import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { ProfileCompletionPrompt } from "@/components/ProfileCompletionPrompt";
 import { SplashScreen } from "@/components/SplashScreen";
+import { CrystalLoader } from "@/components/CrystalLoader";
 import { TopProgressBar } from "@/components/TopProgressBar";
 import { useRealStudyTracker } from "@/lib/studyTimeTracker";
 import { LoginPage } from "@/pages/LoginPage";
@@ -124,11 +125,13 @@ function AppInner() {
   // 1. Loading state while Clerk initializes
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0b0f19]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-3 border-blue-500 border-t-transparent animate-spin" />
-          <span className="text-xs text-slate-400 font-medium">Loading Quizzy...</span>
-        </div>
+      <div
+        className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden select-none"
+        style={{
+          background: "radial-gradient(circle at 50% 45%, #faf7f0 0%, #f3efe6 50%, #eae4d6 100%)",
+        }}
+      >
+        <CrystalLoader />
       </div>
     );
   }
