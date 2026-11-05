@@ -114,7 +114,7 @@ router.get("/revision-cards", async (req, res): Promise<void> => {
 });
 
 // ── PATCH /api/revision-cards/:id/master ──
-// Updates mastery status and increments review count
+// Updates mastery status and increments review count with ownership validation
 router.patch("/revision-cards/:id/master", async (req, res): Promise<void> => {
   const idStr = String(req.params.id || "").replace(/^card_/, "");
   const numId = parseInt(idStr, 10);
@@ -123,10 +123,28 @@ router.patch("/revision-cards/:id/master", async (req, res): Promise<void> => {
     return;
   }
 
-  const { mastered } = req.body as { mastered?: boolean };
-  const isMastered = Boolean(mastered);
+  const { mastered, userId, userName } = req.body as { mastered?: boolean; userId?: string; userName?: string };
+  const queryParam = (req.query.userId || req.query.userName || userId || userName) as string | undefined;
+  const targetUserId = await resolveInternalUserId(req.user?.id, queryParam);
 
   try {
+    const existing = await db
+      .select()
+      .from(revisionCardsTable)
+      .where(eq(revisionCardsTable.id, numId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      res.status(404).json({ error: "Revision card not found" });
+      return;
+    }
+
+    if (targetUserId && existing[0].userId !== targetUserId) {
+      res.status(403).json({ error: "Forbidden: You do not own this revision card" });
+      return;
+    }
+
+    const isMastered = Boolean(mastered);
     const [updated] = await db
       .update(revisionCardsTable)
       .set({
@@ -139,19 +157,15 @@ router.patch("/revision-cards/:id/master", async (req, res): Promise<void> => {
       .where(eq(revisionCardsTable.id, numId))
       .returning();
 
-    if (!updated) {
-      res.status(404).json({ error: "Revision card not found" });
-      return;
-    }
-
     res.json({ ok: true, card: updated });
   } catch (err) {
+    req.log?.error?.({ err }, "Error updating card mastery");
     res.status(500).json({ error: "Failed to update card mastery" });
   }
 });
 
 // ── DELETE /api/revision-cards/:id ──
-// Permanently removes a single card from PostgreSQL
+// Permanently removes a single card from PostgreSQL with ownership validation
 router.delete("/revision-cards/:id", async (req, res): Promise<void> => {
   const idStr = String(req.params.id || "").replace(/^card_/, "");
   const numId = parseInt(idStr, 10);
@@ -160,10 +174,30 @@ router.delete("/revision-cards/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const queryParam = (req.query.userId || req.query.userName) as string | undefined;
+  const targetUserId = await resolveInternalUserId(req.user?.id, queryParam);
+
   try {
+    const existing = await db
+      .select()
+      .from(revisionCardsTable)
+      .where(eq(revisionCardsTable.id, numId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      res.status(404).json({ error: "Revision card not found" });
+      return;
+    }
+
+    if (targetUserId && existing[0].userId !== targetUserId) {
+      res.status(403).json({ error: "Forbidden: You do not own this revision card" });
+      return;
+    }
+
     await db.delete(revisionCardsTable).where(eq(revisionCardsTable.id, numId));
     res.json({ ok: true });
   } catch (err) {
+    req.log?.error?.({ err }, "Error deleting revision card");
     res.status(500).json({ error: "Failed to delete revision card" });
   }
 });
