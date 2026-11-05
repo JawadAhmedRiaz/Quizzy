@@ -23,6 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
+  openRegisterModal: () => void;
   closeAuthModal: () => void;
   login: () => void;
   logout: () => Promise<void>;
@@ -44,7 +45,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useClerkUser();
-  const { openSignIn, signOut } = useClerk();
+  const { openSignIn, openSignUp, signOut } = useClerk();
 
   const [backendUser, setBackendUser] = useState<AuthUser | null>(null);
   const [backendLoading, setBackendLoading] = useState(true);
@@ -100,6 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [openSignIn]);
 
+  const openRegisterModal = useCallback(() => {
+    if (openSignUp) {
+      openSignUp();
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  }, [openSignUp]);
+
   const closeAuthModal = useCallback(() => {
     setIsAuthModalOpen(false);
   }, []);
@@ -140,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!isSignedIn,
     isAuthModalOpen,
     openAuthModal,
+    openRegisterModal,
     closeAuthModal,
     login,
     logout,

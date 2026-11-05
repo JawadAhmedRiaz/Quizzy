@@ -1,0 +1,274 @@
+/* ── Glass Login Page Styles ── */
+
+.login-stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, #faf7f0 0%, #f3efe6 50%, #eae4d6 100%);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* 30% Blue: Ambient luminous glow behind the glass */
+.login-ambient-glow {
+  position: absolute;
+  width: 680px;
+  height: 680px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(37, 99, 235, 0.32) 0%,
+    rgba(30, 64, 175, 0.22) 40%,
+    rgba(29, 78, 216, 0.08) 65%,
+    transparent 80%
+  );
+  filter: blur(85px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-ambient-glow-secondary {
+  position: absolute;
+  width: 450px;
+  height: 450px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%);
+  filter: blur(95px);
+  top: 15%;
+  left: 20%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* BACKGROUND LAYER: QUIZZY with Crème-to-Blue Gradient */
+.login-quizzy-bg-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.login-quizzy-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(9rem, 24vw, 26rem);
+  line-height: 0.85;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 900;
+  white-space: nowrap;
+  background: linear-gradient(
+    180deg,
+    #fffbf0 0%,
+    #fef7e2 25%,
+    #cbdffc 50%,
+    #3b82f6 75%,
+    #1d4ed8 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 15px 35px rgba(30, 64, 175, 0.3));
+}
+
+/* CENTER SQUARE GLASS */
+.login-glass-square {
+  position: relative;
+  z-index: 2;
+  width: min(496px, 88vw);
+  height: min(496px, 88vw);
+  aspect-ratio: 1 / 1;
+  border-radius: 36px;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px) saturate(190%);
+  -webkit-backdrop-filter: blur(12px) saturate(190%);
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 30px 70px -15px rgba(26, 32, 60, 0.12),
+    0 10px 25px -5px rgba(37, 99, 235, 0.08),
+    inset 0 1px 3px rgba(255, 255, 255, 0.95),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2.5rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.login-glass-square:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 35px 80px -15px rgba(26, 32, 60, 0.16),
+    0 12px 30px -5px rgba(37, 99, 235, 0.12),
+    inset 0 1px 3px rgba(255, 255, 255, 1);
+}
+
+/* Card Top Section */
+.login-card-top-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card-desc {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: 0px;
+  color: #475569;
+  text-align: center;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Card Buttons Section */
+.login-card-actions {
+  display: flex;
+  flex-direction: column;
+  margin-top: 120px;
+  transform: translateY(-70px);
+  gap: 32px;
+}
+
+/* ── CyberButton CSS ── */
+.cyber-btn-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.cyber-btn-wrapper button {
+  position: relative;
+  width: 100%;
+  max-width: 18em;
+  outline: none;
+  transition: all 0.25s ease;
+  background-color: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ddebf0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cyber-btn-label {
+  position: relative;
+  z-index: 5;
+  padding: 0 1rem;
+  transition: all 0.25s ease;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.cyber-btn-wrapper button:hover .cyber-btn-label {
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.cyber-btn-clip {
+  --color: #2761c3;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border: 5px double var(--color);
+  box-shadow: inset 0px 0px 15px #195480;
+  background-color: rgba(30, 64, 175, 0.08);
+  transition: all 0.3s ease;
+  clip-path: polygon(
+    20% 0%,
+    80% 0%,
+    100% 25%,
+    100% 75%,
+    80% 100%,
+    20% 100%,
+    0% 75%,
+    0% 25%
+  );
+}
+
+.cyber-btn-wrapper button:hover .cyber-btn-clip {
+  --color: #60a5fa;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+  box-shadow:
+    inset 0px 0px 25px rgba(255, 255, 255, 0.35),
+    0 0 25px rgba(37, 99, 235, 0.6);
+}
+
+.cyber-btn-arrow {
+  position: absolute;
+  transition: 0.25s ease;
+  background-color: #2761c3;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 11%;
+  height: 30%;
+  max-height: 14px;
+  z-index: 4;
+}
+
+.cyber-btn-arrow-left {
+  left: -13.5%;
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+
+.cyber-btn-arrow-right {
+  clip-path: polygon(100% 49%, 0 0, 0 100%);
+  left: 102%;
+}
+
+.cyber-btn-wrapper button:hover .cyber-btn-arrow-right {
+  background-color: #60a5fa;
+  box-shadow: 0 0 10px #3b82f6;
+  left: -15%;
+  animation: 0.6s ease-in-out both infinite alternate cyber-rightArrow;
+}
+
+.cyber-btn-wrapper button:hover .cyber-btn-arrow-left {
+  background-color: #60a5fa;
+  box-shadow: 0 0 10px #3b82f6;
+  left: 103%;
+  animation: 0.6s ease-in-out both infinite alternate cyber-leftArrow;
+}
+
+.cyber-btn-corner {
+  position: absolute;
+  width: 4em;
+  height: 4em;
+  background-color: #2761c3;
+  box-shadow: inset 1px 1px 8px #2781c3;
+  transform: scale(1) rotate(45deg);
+  transition: 0.25s ease;
+  z-index: 1;
+}
+
+.cyber-btn-corner-rt { top: -2em; left: 90%; }
+.cyber-btn-corner-lt { top: -2em; left: -3em; }
+.cyber-btn-corner-lb { bottom: -2em; left: -2em; }
+.cyber-btn-corner-rb { bottom: -2em; left: 88%; }
+
+.cyber-btn-wrapper button:hover .cyber-btn-corner {
+  background-color: #1d4ed8;
+  box-shadow: inset 1px 1px 10px #60a5fa, 0 0 10px rgba(37, 99, 235, 0.5);
+  transform: scale(1.25) rotate(45deg);
+}
+
+@keyframes cyber-leftArrow {
+  from { transform: translateY(-50%) translate(0px); }
+  to { transform: translateY(-50%) translateX(10px); }
+}
+
+@keyframes cyber-rightArrow {
+  from { transform: translateY(-50%) translate(0px); }
+  to { transform: translateY(-50%) translateX(-10px); }
+}
