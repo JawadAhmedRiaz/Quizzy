@@ -151,6 +151,15 @@ export function recordMistakesFromQuiz(
 
 export function markMistakeMastered(id: string, mastered: boolean = true) {
   const current = getAllMistakes();
+  const toUpdate = current.find((m) => m.id === id);
+  if (toUpdate && toUpdate.id.startsWith("card_")) {
+    fetch(`/api/revision-cards/${toUpdate.id}/master`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ mastered }),
+    }).catch(() => {});
+  }
   const updated = current.map((m) => {
     if (m.id === id) {
       return {
@@ -168,15 +177,18 @@ export function markMistakeMastered(id: string, mastered: boolean = true) {
 export function deleteMistake(id: string) {
   const current = getAllMistakes();
   const toDelete = current.find((m) => m.id === id);
-  if (toDelete?.question?.q) {
-    saveDeletedMistakeKey(toDelete.question.q);
-    // Also persist server-side so deletion survives across devices/incognito
-    fetch("/api/quiz-reports/mistakes", {
+  if (toDelete) {
+    if (toDelete.question?.q) {
+      saveDeletedMistakeKey(toDelete.question.q);
+    }
+    const endpoint = toDelete.id.startsWith("card_")
+      ? `/api/revision-cards/${toDelete.id}`
+      : `/api/revision-cards/${id}`;
+
+    fetch(endpoint, {
       method: "DELETE",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ questionText: toDelete.question.q }),
-    }).catch(() => {}); // fire-and-forget, localStorage is the immediate source of truth
+    }).catch(() => {});
   }
   const updated = current.filter((m) => m.id !== id);
   saveMistakes(updated);
@@ -184,15 +196,16 @@ export function deleteMistake(id: string) {
 
 export function clearAllMasteredMistakes() {
   const current = getAllMistakes();
-  current.filter((m) => m.mastered).forEach((m) => {
-    if (m.question?.q) saveDeletedMistakeKey(m.question.q);
-  });
+  fetch("/api/revision-cards", {
+    method: "DELETE",
+    credentials: "include",
+  }).catch(() => {});
   const updated = current.filter((m) => !m.mastered);
   saveMistakes(updated);
 }
 
 /**
- * Synchronizes previous exam mistakes from PostgreSQL database quiz reports
+ * Synchronizes revision cards directly from PostgreSQL database
  */
 export async function syncMistakesFromDatabase(userName?: string): Promise<MistakeRecord[]> {
   if (
@@ -206,46 +219,26 @@ export async function syncMistakesFromDatabase(userName?: string): Promise<Mista
   }
   try {
     const query = userName ? `?userName=${encodeURIComponent(userName)}` : "";
-    const res = await fetch(`/api/quiz-reports/mistakes${query}`);
-    if (!res.ok) return getAllMistakes();
-    const dbMistakes: MistakeRecord[] = await res.json();
-    if (!Array.isArray(dbMistakes) || dbMistakes.length === 0) return getAllMistakes();
-
-    const deletedKeys = getDeletedMistakeKeys();
-    const localMistakes = getAllMistakes();
-    const localMap = new Map(localMistakes.map((m) => [m.question?.q?.trim().toLowerCase(), m]));
-
-    const merged: MistakeRecord[] = [];
-
-    // Process all DB mistakes
-    dbMistakes.forEach((dbM) => {
-      const qKey = dbM.question?.q?.trim().toLowerCase();
-      if (qKey && deletedKeys.has(qKey)) {
-        return; // Skip user-deleted questions
+    const res = await fetch(`/api/revision-cards${query}`, { credentials: "include" });
+    if (res.ok) {
+      const dbCards = await res.json();
+      if (Array.isArray(dbCards) && dbCards.length > 0) {
+        saveMistakes(dbCards);
+        return dbCards;
       }
-      const localMatch = localMap.get(qKey);
+    }
 
-      if (localMatch) {
-        // Keep local mastery state, but ensure complete question data from DB
-        merged.push({
-          ...dbM,
-          mastered: localMatch.mastered,
-          masteredAt: localMatch.masteredAt,
-          reviewCount: Math.max(dbM.reviewCount || 0, localMatch.reviewCount || 0),
-        });
-        localMap.delete(qKey);
-      } else {
-        merged.push(dbM);
+    // Fallback to legacy endpoint if transition in progress
+    const legacyRes = await fetch(`/api/quiz-reports/mistakes${query}`);
+    if (legacyRes.ok) {
+      const dbMistakes: MistakeRecord[] = await legacyRes.json();
+      if (Array.isArray(dbMistakes) && dbMistakes.length > 0) {
+        saveMistakes(dbMistakes);
+        return dbMistakes;
       }
-    });
+    }
 
-    // Add any remaining local mistakes
-    localMap.forEach((localM) => {
-      merged.push(localM);
-    });
-
-    saveMistakes(merged);
-    return merged;
+    return getAllMistakes();
   } catch (err) {
     console.error("Failed to sync mistakes with DB:", err);
     return getAllMistakes();

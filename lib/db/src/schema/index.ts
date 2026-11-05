@@ -10,3 +10,4 @@ export * from "./subjects";
 export * from "./feedbacks";
 export * from "./semesters";
 export * from "./vault";
+export * from "./revision";

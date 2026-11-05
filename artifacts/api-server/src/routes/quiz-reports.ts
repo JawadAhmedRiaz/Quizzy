@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, max, count } from "drizzle-orm";
-import { db, quizReportsTable, profilesTable, usersTable, questionsTable, attemptedQuestionsTable } from "@workspace/db";
+import { eq, desc, max, count, sql } from "drizzle-orm";
+import { db, quizReportsTable, profilesTable, usersTable, questionsTable, attemptedQuestionsTable, revisionCardsTable } from "@workspace/db";
 import { SubmitQuizReportBody } from "@workspace/api-zod";
 import type { QuizReport } from "@workspace/db";
+import { generateCanonicalQuestionHash } from "./revision";
 
 const router: IRouter = Router();
 
@@ -163,6 +164,95 @@ router.post("/quiz-reports", async (req, res): Promise<void> => {
       userName: cleanName,
     })
     .returning();
+
+  // Atomic upsert of mistakes into revisionCardsTable
+  try {
+    const rawAnswers = JSON.parse(parsed.data.answersJson || "[]");
+    if (Array.isArray(rawAnswers) && rawAnswers.length > 0) {
+      const users = await db.select().from(usersTable);
+      const profiles = await db.select().from(profilesTable);
+
+      const matchedUser =
+        users.find(
+          (u) =>
+            u.id === parsed.data.userName ||
+            u.email?.toLowerCase() === parsed.data.userName.toLowerCase() ||
+            cleanName.toLowerCase() === (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim().toLowerCase() : "")
+        ) || profiles.find((p) => p.displayName?.trim().toLowerCase() === cleanName.toLowerCase());
+
+      const targetUserId = matchedUser ? ("id" in matchedUser ? matchedUser.id : matchedUser.userId) : null;
+
+      if (targetUserId) {
+        const allQuestions = await db.select().from(questionsTable);
+        const qBankMap = new Map<string, (typeof allQuestions)[0]>();
+        allQuestions.forEach((q) => {
+          if (q.question) qBankMap.set(q.question.trim().toLowerCase().replace(/\s+/g, " "), q);
+        });
+
+        for (const ans of rawAnswers) {
+          if (!ans.isCorrect && !ans.skipped && ans.q) {
+            const qText = String(ans.q).trim();
+            const normQ = qText.toLowerCase().replace(/\s+/g, " ");
+            const dbMatch = qBankMap.get(normQ);
+
+            const options = dbMatch
+              ? [dbMatch.optionA, dbMatch.optionB, dbMatch.optionC, dbMatch.optionD]
+              : Array.isArray(ans.options)
+              ? ans.options
+              : Array.isArray(ans.o)
+              ? ans.o
+              : ["Option A", "Option B", "Option C", "Option D"];
+
+            let correctIndex = typeof ans.correct === "number" ? ans.correct : 0;
+            if (dbMatch && dbMatch.correctAnswer) {
+              const letter = String(dbMatch.correctAnswer).toUpperCase().trim();
+              if (letter === "A") correctIndex = 0;
+              else if (letter === "B") correctIndex = 1;
+              else if (letter === "C") correctIndex = 2;
+              else if (letter === "D") correctIndex = 3;
+            }
+
+            let selectedIndex = typeof ans.selected === "number" ? ans.selected : null;
+            if (selectedIndex !== null && (selectedIndex < 0 || selectedIndex > 3)) {
+              selectedIndex = null;
+            }
+
+            const explanation = dbMatch?.briefing || "Review the core concepts for this question.";
+            const qHash = generateCanonicalQuestionHash(qText, options, correctIndex);
+
+            await db
+              .insert(revisionCardsTable)
+              .values({
+                userId: targetUserId,
+                subject: parsed.data.subject || "General",
+                questionHash: qHash,
+                questionText: qText,
+                optionsJson: JSON.stringify(options),
+                correctIndex,
+                lastSelectedIndex: selectedIndex,
+                explanation,
+                mastered: false,
+                reviewCount: 0,
+                mistakeCount: 1,
+                sourceQuizId: parsed.data.quizId,
+              })
+              .onConflictDoUpdate({
+                target: [revisionCardsTable.userId, revisionCardsTable.questionHash],
+                set: {
+                  mistakeCount: sql`${revisionCardsTable.mistakeCount} + 1`,
+                  lastSelectedIndex: selectedIndex,
+                  mastered: false, // re-challenge student
+                  sourceQuizId: parsed.data.quizId,
+                  updatedAt: new Date(),
+                },
+              });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    req.log?.warn?.({ err }, "Failed to upsert revision cards during quiz submission");
+  }
 
   res.status(201).json({
     ...inserted,
