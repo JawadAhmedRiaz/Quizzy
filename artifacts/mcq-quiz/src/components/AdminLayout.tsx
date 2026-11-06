@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@/context/UserContext";
 
@@ -44,6 +44,21 @@ interface Props { children: ReactNode }
 export function AdminLayout({ children }: Props) {
   const [location, navigate] = useLocation();
   const { isAdmin } = useUser();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar drawer on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location]);
+
+  // Close sidebar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const lastStudentPage =
     typeof window !== "undefined"
@@ -89,19 +104,77 @@ export function AdminLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#0f172a", fontFamily: "'Inter', sans-serif" }}>
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 bottom-0 w-56 flex flex-col z-30 overflow-y-auto"
-        style={{ background: "#1e293b", borderRight: "1px solid #334155" }}>
-
-        {/* Logo */}
-        <div className="px-4 py-4 flex items-center gap-2.5 shrink-0" style={{ borderBottom: "1px solid #334155" }}>
+    <div className="min-h-screen flex flex-col md:flex-row" style={{ background: "#0f172a", fontFamily: "'Inter', sans-serif" }}>
+      {/* Mobile Top Header */}
+      <header
+        className="md:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-40 shrink-0"
+        style={{
+          background: "#1e293b",
+          borderBottom: "1px solid #334155",
+          paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))",
+        }}
+      >
+        <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>⚡</div>
           <div>
             <p className="text-xs font-black text-white leading-none">Quizzy</p>
             <p className="text-[10px] font-semibold" style={{ color: "#6366f1" }}>Admin Portal</p>
           </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 active:scale-95 transition-all cursor-pointer"
+          aria-label="Toggle admin navigation menu"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" x2="20" y1="6" y2="6" />
+            <line x1="4" x2="20" y1="12" y2="12" />
+            <line x1="4" x2="20" y1="18" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      {/* Backdrop for mobile drawer */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 bottom-0 w-64 md:w-56 flex flex-col z-50 overflow-y-auto transition-transform duration-200 ease-in-out md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{
+          background: "#1e293b",
+          borderRight: "1px solid #334155",
+          paddingTop: "max(0rem, env(safe-area-inset-top, 0px))",
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+
+        {/* Logo (Desktop & Mobile Drawer Header) */}
+        <div className="px-4 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid #334155" }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
+              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>⚡</div>
+            <div>
+              <p className="text-xs font-black text-white leading-none">Quizzy</p>
+              <p className="text-[10px] font-semibold" style={{ color: "#6366f1" }}>Admin Portal</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white"
+            aria-label="Close sidebar"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Navigation */}
@@ -113,8 +186,8 @@ export function AdminLayout({ children }: Props) {
               {items.map(({ path, icon, label: itemLabel }) => {
                 const active = location === path || (path !== "/admin/site-settings" && location.startsWith(path));
                 return (
-                  <button key={path} onClick={() => navigate(path)}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold text-left transition-all mb-0.5"
+                  <button key={path} onClick={() => { navigate(path); setSidebarOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold text-left transition-all mb-0.5 cursor-pointer"
                     style={{
                       background: active ? "rgba(99,102,241,0.15)" : "transparent",
                       color: active ? "#a5b4fc" : "#94a3b8",
@@ -131,8 +204,8 @@ export function AdminLayout({ children }: Props) {
 
         {/* Back to app */}
         <div className="px-3 py-3 shrink-0" style={{ borderTop: "1px solid #334155" }}>
-          <button onClick={handleBackToApp}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all"
+          <button onClick={() => { handleBackToApp(); setSidebarOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer"
             style={{ background: "transparent", color: "#64748b", border: "1px solid transparent" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#64748b"; }}>
@@ -143,7 +216,7 @@ export function AdminLayout({ children }: Props) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 ml-56 min-h-screen overflow-auto" style={{ color: "#e2e8f0" }}>
+      <main className="admin-main flex-1 ml-0 md:ml-56 min-h-screen overflow-auto" style={{ color: "#e2e8f0" }}>
         {children}
       </main>
     </div>

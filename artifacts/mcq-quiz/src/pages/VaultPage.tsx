@@ -1002,8 +1002,7 @@ export function VaultPage() {
         {/* Fallback open link for mobile users when popup was blocked */}
         {fallbackOpen && (
           <div
-            className="fixed right-4 left-4 sm:left-auto z-50 p-4 rounded-2xl bg-card border border-border shadow-2xl flex items-center justify-between gap-3"
-            style={{ bottom: "max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))" }}
+            className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-4 right-4 left-4 sm:left-auto z-50 p-4 rounded-2xl bg-card border border-border shadow-2xl flex items-center justify-between gap-3"
           >
             <div className="text-xs min-w-0">
               <p className="font-bold text-foreground">Document Ready</p>

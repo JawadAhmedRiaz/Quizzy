@@ -157,8 +157,7 @@ export function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <TopNavbar onOpenSidebar={() => setSidebarOpen(true)} />
+      <TopNavbar />
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
         

@@ -58,7 +58,7 @@ export function FlaggedQuestionsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
+      <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -171,7 +171,7 @@ export function FlaggedQuestionsPage() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

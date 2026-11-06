@@ -4,6 +4,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
 import { useSettings } from "@/context/SettingsContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Sidebar } from "@/components/Sidebar";
 import { useRevisionStats, syncMistakesFromDatabase } from "@/lib/revisionTracker";
 import { renderAvatarSvg, getSavedAvatarId } from "@/components/AnimatedAvatar";
 
@@ -27,6 +28,7 @@ export function TopNavbar(_props: Props = {}) {
 
   const avatarInitial = (displayName?.[0] ?? "U").toUpperCase();
   const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handleAvatarUpdate = () => {
@@ -45,40 +47,41 @@ export function TopNavbar(_props: Props = {}) {
   }, [displayName]);
 
   return (
-    <header className="top-navbar w-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-40 backdrop-blur-md bg-[#FAF7F2]/90 border-b border-[#E6DFD3] shadow-xs">
-      {/* ── TOP LEFT: LOGO ── */}
-      <div className="flex items-center flex-shrink-0">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 transition-transform hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
-        >
-          <img
-            src="/logo-transparent.png"
-            alt="Quizzy Logo"
-            className="h-10 sm:h-12 w-auto object-contain filter drop-shadow(0 2px 8px rgba(0,122,255,0.25))"
-          />
-          <div className="flex flex-col">
-            <span
-              className="text-xl sm:text-2xl font-black tracking-tight leading-tight"
-              style={{
-                fontFamily: "'Poppins', sans-serif",
-                background: "linear-gradient(135deg, #1e3a8a, #007aff)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              {settings.headerTitle || "Quizzy"}
-            </span>
-            <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 leading-none">
-              Since 2026
-            </span>
-          </div>
-        </Link>
-      </div>
+    <>
+      <header className="top-navbar w-full px-3.5 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-40 backdrop-blur-md bg-[#FAF7F2]/90 border-b border-[#E6DFD3] shadow-xs">
+        {/* ── TOP LEFT: LOGO ── */}
+        <div className="flex items-center flex-shrink-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2 sm:gap-2.5 transition-transform hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+          >
+            <img
+              src="/logo-transparent.png"
+              alt="Quizzy Logo"
+              className="h-8 sm:h-10 md:h-12 w-auto object-contain filter drop-shadow(0 2px 8px rgba(0,122,255,0.25))"
+            />
+            <div className="flex flex-col">
+              <span
+                className="text-lg sm:text-xl md:text-2xl font-black tracking-tight leading-tight"
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  background: "linear-gradient(135deg, #1e3a8a, #007aff)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                {settings.headerTitle || "Quizzy"}
+              </span>
+              <span className="hidden sm:inline-block text-[10px] font-bold tracking-widest uppercase text-blue-600 leading-none">
+                Since 2026
+              </span>
+            </div>
+          </Link>
+        </div>
 
-      {/* ── MIDDLE: NAVBAR (.menu) ── */}
-      <div className="flex-1 flex items-center justify-center min-w-0">
-        <nav className="menu" aria-label="Main Navigation">
+        {/* ── MIDDLE: NAVBAR (.menu) - Desktop only ── */}
+        <div className="hidden md:flex flex-1 items-center justify-center min-w-0">
+          <nav className="menu" aria-label="Main Navigation">
           {/* 1. Dashboard */}
           <Link href="/" className={isDashboard ? "active" : ""}>
             <svg
@@ -198,15 +201,12 @@ export function TopNavbar(_props: Props = {}) {
       </div>
 
       {/* ── TOP RIGHT: USER CONTROLS ── */}
-      <div className="flex items-center gap-2.5 flex-shrink-0">
-        {/* Day/Night Theme Toggle */}
-        <ThemeToggle />
-
+      <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         {/* XP Badge */}
         {gamification?.xp !== undefined && (
           <Link
             href="/dashboard"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-[1.03]"
+            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all hover:scale-[1.03]"
             style={{
               background: "rgba(245, 158, 11, 0.14)",
               border: "1px solid rgba(245, 158, 11, 0.32)",
@@ -215,11 +215,17 @@ export function TopNavbar(_props: Props = {}) {
             title="View XP & Progress"
           >
             <span>⚡</span>
-            <span>{gamification.xp.toLocaleString()} XP</span>
+            <span>
+              {gamification.xp.toLocaleString()}{" "}
+              <span className="hidden sm:inline">XP</span>
+            </span>
           </Link>
         )}
 
-        {/* Admin Link if admin */}
+        {/* Day/Night Theme Toggle */}
+        <ThemeToggle />
+
+        {/* Admin Link if admin (desktop only) */}
         {isAdmin && (
           <Link
             href="/admin/site-settings"
@@ -228,7 +234,7 @@ export function TopNavbar(_props: Props = {}) {
                 sessionStorage.setItem("quizzy_last_student_page", location);
               }
             }}
-            className="hidden sm:inline-flex px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all hover:opacity-90"
+            className="hidden md:inline-flex px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all hover:opacity-90"
             style={{ background: "#dc2626", color: "#ffffff" }}
           >
             Admin
@@ -245,7 +251,37 @@ export function TopNavbar(_props: Props = {}) {
             {renderAvatarSvg(avatarId, 36)}
           </div>
         </Link>
+
+        {/* Mobile Hamburger Button (opens Sidebar drawer) */}
+        <button
+          type="button"
+          onClick={() => {
+            setSidebarOpen(true);
+            if (_props.onOpenSidebar) _props.onOpenSidebar();
+          }}
+          className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+          aria-label="Open navigation menu"
+          title="Open Menu"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="4" x2="20" y1="6" y2="6" />
+            <line x1="4" x2="20" y1="12" y2="12" />
+            <line x1="4" x2="20" y1="18" y2="18" />
+          </svg>
+        </button>
       </div>
     </header>
+
+    {/* Render mobile Sidebar drawer */}
+    <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+  </>
   );
 }

@@ -196,8 +196,6 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
       {/* Admin Maintenance Banner */}
       {settings.maintenanceEnabled && isAdmin && (
         <div className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-bold shadow-md z-50"
@@ -215,9 +213,10 @@ export function HomePage() {
       )}
 
       {/* Top Navbar */}
-      <TopNavbar onOpenSidebar={() => setSidebarOpen(true)} />
+      <TopNavbar />
 
-      {/* Hero Slogan */}
+      <main className="flex-1 w-full flex flex-col">
+        {/* Hero Slogan */}
       <div className="w-full text-center px-4 pt-4 pb-2">
         <p className="text-xs sm:text-sm font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>
           {settings.slogan || "Your Personal Learning Management System"}
@@ -453,6 +452,7 @@ export function HomePage() {
           )}
         </AnimatePresence>
       </div>
+      </main>
 
       {/* Footer */}
       <footer className="w-full px-4 py-4 mt-2"

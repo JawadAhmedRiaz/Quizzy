@@ -16,11 +16,16 @@ function xpLevelInfo(xp: number) {
 }
 
 export function Sidebar({ open, onClose }: Props) {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, isAuthenticated, login, logout } = useAuth();
   const { effectiveUserId, profile, gamification, displayName, profileComplete, isAdmin } = useUser();
 
   const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
+
+  // Close drawer on route change
+  useEffect(() => {
+    onClose();
+  }, [location, onClose]);
 
   useEffect(() => {
     const handleAvatarUpdate = () => setAvatarId(getSavedAvatarId());
@@ -59,7 +64,12 @@ export function Sidebar({ open, onClose }: Props) {
             initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="fixed left-0 top-0 bottom-0 z-50 w-72 flex flex-col overflow-y-auto"
-            style={{ background: "hsl(var(--card))", borderRight: "1px solid hsl(var(--border))" }}>
+            style={{
+              background: "hsl(var(--card))",
+              borderRight: "1px solid hsl(var(--border))",
+              paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))",
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+            }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-4 pt-5 pb-3">

@@ -9,6 +9,7 @@ import { UserProvider, useUser } from "@/context/UserContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { ProfileCompletionPrompt } from "@/components/ProfileCompletionPrompt";
+import { BottomNavbar } from "@/components/BottomNavbar";
 import { SplashScreen } from "@/components/SplashScreen";
 import { CrystalLoader } from "@/components/CrystalLoader";
 import { TopProgressBar } from "@/components/TopProgressBar";
@@ -203,6 +204,7 @@ function AppInner() {
           <Route path="/flagged"    component={FlaggedQuestionsPage} />
           <Route component={DashboardPage} />
         </Switch>
+        <BottomNavbar />
         <WelcomeModal
           show={(!splashVisible && showWelcome) || isAuthModalOpen}
           onDismiss={() => {

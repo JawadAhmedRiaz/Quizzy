@@ -256,6 +256,11 @@ header.top-navbar,
   textarea {
     font-size: 16px !important;
   }
+
+  /* Bottom padding on mobile pages so content clears the fixed bottom tab bar */
+  main:not(.admin-main) {
+    padding-bottom: max(5.25rem, calc(4.75rem + env(safe-area-inset-bottom, 0px))) !important;
+  }
 }
 
 /* Animated warm cream background */

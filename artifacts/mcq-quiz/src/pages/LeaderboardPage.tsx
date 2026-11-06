@@ -100,7 +100,7 @@ export function LeaderboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-1 w-full max-w-xl mx-auto px-4 py-6 flex flex-col gap-4">
+      <main className="flex-1 w-full max-w-xl mx-auto px-4 py-6 flex flex-col gap-4">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -342,7 +342,7 @@ export function LeaderboardPage() {
             Take This Quiz →
           </button>
         )}
-      </div>
+      </main>
     </div>
   );
 }
