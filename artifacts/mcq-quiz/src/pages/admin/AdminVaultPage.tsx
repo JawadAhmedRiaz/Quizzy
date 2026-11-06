@@ -93,6 +93,9 @@ export function AdminVaultPage() {
   const [uploadFilePreview, setUploadFilePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [uploadNotice, setUploadNotice] = useState("");
+  const [isUploadDragging, setIsUploadDragging] = useState(false);
+  const uploadDragCounter = useRef(0);
   const [previewDoc, setPreviewDoc] = useState<VaultDoc | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -306,7 +309,119 @@ export function AdminVaultPage() {
   const [replaceFile, setReplaceFile] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editNotice, setEditNotice] = useState("");
+  const [isEditDragging, setIsEditDragging] = useState(false);
+  const editDragCounter = useRef(0);
   const editFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const closeEditModal = () => {
+    setEditModalOpen(false);
+    setEditingItem(null);
+    setEditTitle("");
+    setEditSubjectId("");
+    setEditDescription("");
+    setEditFile(null);
+    setReplaceFile(false);
+    setEditError("");
+    setEditNotice("");
+    setIsEditDragging(false);
+    editDragCounter.current = 0;
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
+  };
+
+  // Prevent browser default file open behavior when upload or edit modal is open
+  useEffect(() => {
+    if (!uploadModalOpen && !editModalOpen) return;
+
+    const handleWindowDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("dragover", handleWindowDragOver);
+    window.addEventListener("drop", handleWindowDrop);
+
+    return () => {
+      window.removeEventListener("dragover", handleWindowDragOver);
+      window.removeEventListener("drop", handleWindowDrop);
+    };
+  }, [uploadModalOpen, editModalOpen]);
+
+  // Shared file processor for Upload and Edit modals (validations, notices, input resets)
+  const processSelectedFile = (
+    file: File,
+    target: "upload" | "edit",
+    options?: { droppedCount?: number }
+  ): boolean => {
+    if (target === "upload") {
+      setUploadError("");
+      setUploadNotice("");
+    } else {
+      setEditError("");
+      setEditNotice("");
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!ALLOWED_VAULT_EXTS.has(ext)) {
+      const msg = `Invalid file extension ".${ext}". Allowed formats: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG.`;
+      if (target === "upload") {
+        setUploadError(msg);
+        setUploadFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } else {
+        setEditError(msg);
+        setEditFile(null);
+        if (editFileInputRef.current) editFileInputRef.current.value = "";
+      }
+      return false;
+    }
+
+    if (file.size > MAX_VAULT_FILE_SIZE) {
+      const msg = `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 50 MB.`;
+      if (target === "upload") {
+        setUploadError(msg);
+        setUploadFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } else {
+        setEditError(msg);
+        setEditFile(null);
+        if (editFileInputRef.current) editFileInputRef.current.value = "";
+      }
+      return false;
+    }
+
+    if (target === "upload") {
+      setUploadFile(file);
+      if (!uploadTitle.trim()) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, "");
+        setUploadTitle(cleanName);
+      }
+      if (ext === "pdf" || ext === "ppt" || ext === "pptx") {
+        setUploadCategory("pdf");
+      } else if (file.type.startsWith("image/") || ext === "png" || ext === "jpg" || ext === "jpeg") {
+        setUploadCategory("handwritten");
+      } else if (ext === "doc" || ext === "docx") {
+        setUploadCategory("notes");
+      }
+      if (options?.droppedCount && options.droppedCount > 1) {
+        setUploadNotice(`Only one file at a time, using "${file.name}"`);
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } else {
+      setEditFile(file);
+      if (options?.droppedCount && options.droppedCount > 1) {
+        setEditNotice(`Only one file at a time, using "${file.name}"`);
+      }
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+    }
+
+    return true;
+  };
 
   const handleOpenEdit = (doc: VaultDoc, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -318,33 +433,57 @@ export function AdminVaultPage() {
     setEditFile(null);
     setReplaceFile(false);
     setEditError("");
+    setEditNotice("");
+    setIsEditDragging(false);
+    editDragCounter.current = 0;
     setEditModalOpen(true);
   };
 
   const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditError("");
     const file = e.target.files?.[0];
-    if (!file) {
-      setEditFile(null);
-      return;
+    if (file) {
+      processSelectedFile(file, "edit");
     }
+    e.target.value = "";
+  };
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (!ALLOWED_VAULT_EXTS.has(ext)) {
-      setEditError(`Invalid file extension ".${ext}". Allowed: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG.`);
-      setEditFile(null);
-      if (editFileInputRef.current) editFileInputRef.current.value = "";
-      return;
+  const handleEditDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (savingEdit) return;
+    editDragCounter.current += 1;
+    setIsEditDragging(true);
+  };
+
+  const handleEditDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (savingEdit) return;
+    e.dataTransfer.dropEffect = "copy";
+    setIsEditDragging(true);
+  };
+
+  const handleEditDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    editDragCounter.current = Math.max(0, editDragCounter.current - 1);
+    if (editDragCounter.current === 0 || (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node))) {
+      editDragCounter.current = 0;
+      setIsEditDragging(false);
     }
+  };
 
-    if (file.size > MAX_VAULT_FILE_SIZE) {
-      setEditError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 50 MB.`);
-      setEditFile(null);
-      if (editFileInputRef.current) editFileInputRef.current.value = "";
-      return;
-    }
+  const handleEditDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    editDragCounter.current = 0;
+    setIsEditDragging(false);
+    if (savingEdit) return;
 
-    setEditFile(file);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    setReplaceFile(true);
+    processSelectedFile(files[0], "edit", { droppedCount: files.length });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -391,7 +530,7 @@ export function AdminVaultPage() {
         if (previewDoc?.id === updated.id) {
           setPreviewDoc(updated);
         }
-        setEditModalOpen(false);
+        closeEditModal();
       } else {
         const errData = await res.json().catch(() => ({}));
         if (res.status === 413) {
@@ -590,40 +729,49 @@ export function AdminVaultPage() {
 
   // Handle file select with client-side extension and 50 MB size validation
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUploadError("");
     const file = e.target.files?.[0];
-    if (!file) {
-      setUploadFile(null);
-      return;
+    if (file) {
+      processSelectedFile(file, "upload");
     }
+    e.target.value = "";
+  };
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (!ALLOWED_VAULT_EXTS.has(ext)) {
-      setUploadError(`Invalid file extension ".${ext}". Allowed formats: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG.`);
-      setUploadFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
+  const handleUploadDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (uploading) return;
+    uploadDragCounter.current += 1;
+    setIsUploadDragging(true);
+  };
 
-    if (file.size > MAX_VAULT_FILE_SIZE) {
-      setUploadError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 50 MB.`);
-      setUploadFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
+  const handleUploadDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (uploading) return;
+    e.dataTransfer.dropEffect = "copy";
+    setIsUploadDragging(true);
+  };
 
-    setUploadFile(file);
-    if (!uploadTitle) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, "");
-      setUploadTitle(cleanName);
+  const handleUploadDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadDragCounter.current = Math.max(0, uploadDragCounter.current - 1);
+    if (uploadDragCounter.current === 0 || (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node))) {
+      uploadDragCounter.current = 0;
+      setIsUploadDragging(false);
     }
-    if (ext === "pdf" || ext === "ppt" || ext === "pptx") {
-      setUploadCategory("pdf");
-    } else if (file.type.startsWith("image/") || ext === "png" || ext === "jpg" || ext === "jpeg") {
-      setUploadCategory("handwritten");
-    } else if (ext === "doc" || ext === "docx") {
-      setUploadCategory("notes");
-    }
+  };
+
+  const handleUploadDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadDragCounter.current = 0;
+    setIsUploadDragging(false);
+    if (uploading) return;
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    processSelectedFile(files[0], "upload", { droppedCount: files.length });
   };
 
   // Handle upload submit (multipart/form-data for Supabase Storage)
@@ -689,6 +837,9 @@ export function AdminVaultPage() {
     setUploadFile(null);
     setUploadFilePreview(null);
     setUploadError("");
+    setUploadNotice("");
+    setIsUploadDragging(false);
+    uploadDragCounter.current = 0;
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -1189,8 +1340,16 @@ export function AdminVaultPage() {
                     className="hidden"
                   />
                   <div
+                    onDragEnter={handleUploadDragEnter}
+                    onDragOver={handleUploadDragOver}
+                    onDragLeave={handleUploadDragLeave}
+                    onDrop={handleUploadDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-4 border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-800/40"
+                    className={`p-5 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                      isUploadDragging
+                        ? "border-indigo-400 bg-indigo-500/20 scale-[1.01]"
+                        : "border-slate-700 hover:border-indigo-500 bg-slate-800/40"
+                    }`}
                   >
                     {uploadFile ? (
                       <div>
@@ -1200,17 +1359,25 @@ export function AdminVaultPage() {
                           {uploadFile.size > 1024 * 1024
                             ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
                             : `${(uploadFile.size / 1024).toFixed(1)} KB`}{" "}
-                          • Click to choose a different file
+                          • Click or drop to choose a different file
                         </p>
                       </div>
                     ) : (
                       <div>
-                        <span className="text-xl block mb-0.5">☁️</span>
-                        <p className="text-xs font-bold text-white">Click to browse or drop file</p>
+                        <span className="text-xl block mb-0.5">{isUploadDragging ? "📥" : "☁️"}</span>
+                        <p className="text-xs font-bold text-white">
+                          {isUploadDragging ? "Drop file here" : "Click to browse or drop file"}
+                        </p>
                         <p className="text-[10px] text-slate-400 mt-0.5">Supports PDF documents, slides (.ppt, .pptx), Word notes, and images (up to 50 MB)</p>
                       </div>
                     )}
                   </div>
+                  {uploadNotice && (
+                    <div className="mt-2 p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1.5">
+                      <span>ℹ️</span>
+                      <span>{uploadNotice}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
@@ -1245,7 +1412,7 @@ export function AdminVaultPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEditModalOpen(false)}
+                  onClick={closeEditModal}
                   className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
                 >
                   ✕
@@ -1314,7 +1481,17 @@ export function AdminVaultPage() {
                 </div>
 
                 {/* File Replacement Section */}
-                <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex flex-col gap-2.5">
+                <div
+                  onDragEnter={handleEditDragEnter}
+                  onDragOver={handleEditDragOver}
+                  onDragLeave={handleEditDragLeave}
+                  onDrop={handleEditDrop}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isEditDragging
+                      ? "border-indigo-400 bg-indigo-500/20"
+                      : "bg-slate-800/80 border-slate-700/80"
+                  } flex flex-col gap-2.5`}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-bold text-slate-200">Current File</p>
@@ -1330,6 +1507,7 @@ export function AdminVaultPage() {
                           setReplaceFile(e.target.checked);
                           if (!e.target.checked) {
                             setEditFile(null);
+                            setEditNotice("");
                             if (editFileInputRef.current) editFileInputRef.current.value = "";
                           }
                         }}
@@ -1348,14 +1526,36 @@ export function AdminVaultPage() {
                         accept=".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg"
                         className="hidden"
                       />
-                      <button
-                        type="button"
+                      <div
                         onClick={() => editFileInputRef.current?.click()}
-                        className="w-full py-2.5 px-3 rounded-xl border border-dashed border-indigo-500/50 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs text-indigo-300 font-semibold flex items-center justify-center gap-2 transition-colors"
+                        className={`w-full py-3 px-3 rounded-xl border-2 border-dashed cursor-pointer text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
+                          isEditDragging
+                            ? "border-indigo-400 bg-indigo-500/25 text-white scale-[1.01]"
+                            : "border-indigo-500/50 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300"
+                        }`}
                       >
-                        <span>📁</span>
-                        <span>{editFile ? editFile.name : "Select Replacement File (Max 50 MB)"}</span>
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <span>{isEditDragging ? "📥" : "📁"}</span>
+                          <span>
+                            {editFile
+                              ? editFile.name
+                              : isEditDragging
+                              ? "Drop replacement file here"
+                              : "Click to browse or drop replacement file"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          {editFile
+                            ? `${(editFile.size / (1024 * 1024)).toFixed(2)} MB • Click or drop to choose different file`
+                            : "Supports PDF, PPT, PPTX, DOC, DOCX, PNG, JPG (up to 50 MB)"}
+                        </p>
+                      </div>
+                      {editNotice && (
+                        <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1.5">
+                          <span>ℹ️</span>
+                          <span>{editNotice}</span>
+                        </div>
+                      )}
                       {editFile && (
                         <p className="text-[10px] text-emerald-400 text-center font-bold">
                           ✓ Ready to upload: {editFile.name} ({(editFile.size / (1024 * 1024)).toFixed(2)} MB)
@@ -1368,7 +1568,7 @@ export function AdminVaultPage() {
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setEditModalOpen(false)}
+                    onClick={closeEditModal}
                     disabled={savingEdit}
                     className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50"
                   >
