@@ -32,6 +32,29 @@ interface VaultDoc {
 const ALLOWED_VAULT_EXTS = new Set(["pdf", "ppt", "pptx", "doc", "docx", "png", "jpg", "jpeg"]);
 const MAX_VAULT_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
+export interface UploadQueueItem {
+  id: string;
+  file: File;
+  title: string;
+  category: VaultDoc["category"];
+  status: "waiting" | "uploading" | "done" | "failed";
+  errorMessage?: string;
+  isDuplicateWarn?: boolean;
+}
+
+export interface RejectedFile {
+  name: string;
+  size: number;
+  reason: string;
+}
+
+export function guessVaultCategory(ext: string, mime?: string): VaultDoc["category"] {
+  if (ext === "pdf" || ext === "ppt" || ext === "pptx") return "pdf";
+  if (mime?.startsWith("image/") || ["png", "jpg", "jpeg", "webp"].includes(ext)) return "handwritten";
+  if (ext === "doc" || ext === "docx") return "notes";
+  return "pdf";
+}
+
 export function getDocumentKind(mimeType?: string, fileName?: string): "image" | "pdf" | "office" | "other" {
   const mime = (mimeType || "").trim().toLowerCase();
   const ext = (fileName || "").split(".").pop()?.toLowerCase() || "";
@@ -83,14 +106,12 @@ export function AdminVaultPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Upload Form states
+  // Upload Form states (Batch & Multi-File Support)
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [uploadTitle, setUploadTitle] = useState("");
   const [uploadSubjectId, setUploadSubjectId] = useState<number | "">("");
-  const [uploadCategory, setUploadCategory] = useState<VaultDoc["category"]>("pdf");
   const [uploadDescription, setUploadDescription] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadFilePreview, setUploadFilePreview] = useState<string | null>(null);
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const [rejectedFiles, setRejectedFiles] = useState<RejectedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadNotice, setUploadNotice] = useState("");
@@ -352,75 +373,22 @@ export function AdminVaultPage() {
     };
   }, [uploadModalOpen, editModalOpen]);
 
-  // Shared file processor for Upload and Edit modals (validations, notices, input resets)
-  const processSelectedFile = (
-    file: File,
-    target: "upload" | "edit",
-    options?: { droppedCount?: number }
-  ): boolean => {
-    if (target === "upload") {
-      setUploadError("");
-      setUploadNotice("");
-    } else {
-      setEditError("");
-      setEditNotice("");
-    }
-
+  // Shared file validation logic for Vault uploads and edits
+  const processSelectedFile = (file: File): { valid: boolean; reason?: string } => {
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
     if (!ALLOWED_VAULT_EXTS.has(ext)) {
-      const msg = `Invalid file extension ".${ext}". Allowed formats: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG.`;
-      if (target === "upload") {
-        setUploadError(msg);
-        setUploadFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      } else {
-        setEditError(msg);
-        setEditFile(null);
-        if (editFileInputRef.current) editFileInputRef.current.value = "";
-      }
-      return false;
+      return {
+        valid: false,
+        reason: `Invalid format ".${ext}". Allowed: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG`,
+      };
     }
-
     if (file.size > MAX_VAULT_FILE_SIZE) {
-      const msg = `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 50 MB.`;
-      if (target === "upload") {
-        setUploadError(msg);
-        setUploadFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      } else {
-        setEditError(msg);
-        setEditFile(null);
-        if (editFileInputRef.current) editFileInputRef.current.value = "";
-      }
-      return false;
+      return {
+        valid: false,
+        reason: `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Limit is 50 MB`,
+      };
     }
-
-    if (target === "upload") {
-      setUploadFile(file);
-      if (!uploadTitle.trim()) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, "");
-        setUploadTitle(cleanName);
-      }
-      if (ext === "pdf" || ext === "ppt" || ext === "pptx") {
-        setUploadCategory("pdf");
-      } else if (file.type.startsWith("image/") || ext === "png" || ext === "jpg" || ext === "jpeg") {
-        setUploadCategory("handwritten");
-      } else if (ext === "doc" || ext === "docx") {
-        setUploadCategory("notes");
-      }
-      if (options?.droppedCount && options.droppedCount > 1) {
-        setUploadNotice(`Only one file at a time, using "${file.name}"`);
-      }
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } else {
-      setEditFile(file);
-      if (options?.droppedCount && options.droppedCount > 1) {
-        setEditNotice(`Only one file at a time, using "${file.name}"`);
-      }
-      if (editFileInputRef.current) editFileInputRef.current.value = "";
-    }
-
-    return true;
+    return { valid: true };
   };
 
   const handleOpenEdit = (doc: VaultDoc, e: React.MouseEvent) => {
@@ -440,10 +408,21 @@ export function AdminVaultPage() {
   };
 
   const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditError("");
+    setEditNotice("");
     const file = e.target.files?.[0];
-    if (file) {
-      processSelectedFile(file, "edit");
+    if (!file) {
+      setEditFile(null);
+      return;
     }
+    const check = processSelectedFile(file);
+    if (!check.valid) {
+      setEditError(check.reason || "Invalid file");
+      setEditFile(null);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+    setEditFile(file);
     e.target.value = "";
   };
 
@@ -482,8 +461,25 @@ export function AdminVaultPage() {
 
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
+
+    setEditError("");
+    setEditNotice("");
+    const file = files[0];
+    if (files.length > 1) {
+      setEditNotice(`Only one file at a time, using "${file.name}"`);
+    }
+
+    const check = processSelectedFile(file);
+    if (!check.valid) {
+      setEditError(check.reason || "Invalid file");
+      setEditFile(null);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+
     setReplaceFile(true);
-    processSelectedFile(files[0], "edit", { droppedCount: files.length });
+    setEditFile(file);
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -727,11 +723,88 @@ export function AdminVaultPage() {
     }
   };
 
-  // Handle file select with client-side extension and 50 MB size validation
+  const handleUploadFiles = (files: FileList | File[]) => {
+    if (uploading) return;
+    setUploadError("");
+    setUploadNotice("");
+
+    const fileList = Array.from(files);
+    if (fileList.length === 0) return;
+
+    const maxQueue = 20;
+    const currentCount = uploadQueue.length;
+    const availableSlots = Math.max(0, maxQueue - currentCount);
+
+    if (availableSlots === 0) {
+      setUploadNotice("Queue limit reached (20 files maximum per batch). Please upload or remove existing files.");
+      return;
+    }
+
+    const toProcess = fileList.slice(0, availableSlots);
+    if (fileList.length > availableSlots) {
+      setUploadNotice(`Queue capped at 20 files. ${fileList.length - availableSlots} file(s) omitted.`);
+    }
+
+    const newRejected: RejectedFile[] = [];
+    const newItems: UploadQueueItem[] = [];
+
+    for (const file of toProcess) {
+      const check = processSelectedFile(file);
+      if (!check.valid) {
+        newRejected.push({
+          name: file.name,
+          size: file.size,
+          reason: check.reason || "Validation failed",
+        });
+        continue;
+      }
+
+      // Check duplicate against vault items and other queued files
+      const normName = file.name.trim().toLowerCase();
+      const inVault = items.some((item) => {
+        if (item.fileName.trim().toLowerCase() !== normName) return false;
+        if (item.fileSize) {
+          const sizeStr =
+            file.size > 1024 * 1024
+              ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+              : `${(file.size / 1024).toFixed(1)} KB`;
+          return item.fileSize === sizeStr;
+        }
+        return true;
+      });
+      const inQueue = [...uploadQueue, ...newItems].some(
+        (q) => q.file.name.trim().toLowerCase() === normName && q.file.size === file.size
+      );
+
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const defaultTitle = file.name.replace(/\.[^/.]+$/, "");
+      const defaultCat = guessVaultCategory(ext, file.type);
+
+      newItems.push({
+        id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+        file,
+        title: defaultTitle,
+        category: defaultCat,
+        status: "waiting",
+        isDuplicateWarn: inVault || inQueue,
+      });
+    }
+
+    if (newRejected.length > 0) {
+      setRejectedFiles((prev) => [...newRejected, ...prev]);
+    }
+    if (newItems.length > 0) {
+      setUploadQueue((prev) => [...prev, ...newItems]);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processSelectedFile(file, "upload");
+    if (e.target.files) {
+      handleUploadFiles(e.target.files);
     }
     e.target.value = "";
   };
@@ -769,73 +842,103 @@ export function AdminVaultPage() {
     setIsUploadDragging(false);
     if (uploading) return;
 
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
-    processSelectedFile(files[0], "upload", { droppedCount: files.length });
+    if (e.dataTransfer.files) {
+      handleUploadFiles(e.dataTransfer.files);
+    }
   };
 
-  // Handle upload submit (multipart/form-data for Supabase Storage)
-  const handleUploadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUploadError("");
+  const updateQueueItem = (id: string, updates: Partial<UploadQueueItem>) => {
+    setUploadQueue((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    );
+  };
 
-    if (!uploadTitle.trim()) {
-      setUploadError("Please provide a title for the study document.");
-      return;
-    }
+  const removeQueueItem = (id: string) => {
+    if (uploading) return;
+    setUploadQueue((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Handle batch upload sequentially (one file at a time, Render-safe)
+  const handleStartBatchUpload = async (onlyFailed = false) => {
     if (!uploadSubjectId) {
-      setUploadError("Please select a subject.");
-      return;
-    }
-    if (!uploadFile) {
-      setUploadError("Please choose a file to upload.");
+      setUploadError("Please select a target subject before uploading.");
       return;
     }
 
+    const itemsToUpload = uploadQueue.filter((item) =>
+      onlyFailed ? item.status === "failed" : item.status !== "done"
+    );
+
+    if (itemsToUpload.length === 0) {
+      setUploadError("No pending files in the queue to upload.");
+      return;
+    }
+
+    setUploadError("");
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append("file", uploadFile);
-    formData.append("title", uploadTitle.trim());
-    formData.append("subjectId", String(uploadSubjectId));
-    formData.append("category", uploadCategory);
-    if (uploadDescription.trim()) {
-      formData.append("description", uploadDescription.trim());
-    }
+    for (let i = 0; i < itemsToUpload.length; i++) {
+      const item = itemsToUpload[i];
 
-    try {
-      const res = await fetch(`${API}/vault`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+      // Mark this item as uploading
+      setUploadQueue((prev) =>
+        prev.map((q) => (q.id === item.id ? { ...q, status: "uploading", errorMessage: undefined } : q))
+      );
 
-      if (res.ok) {
-        const created = await res.json();
-        setItems((prev) => [created, ...prev]);
-        closeUploadModal();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        if (res.status === 413) {
-          setUploadError(errData.error || "File size exceeds the 50 MB server limit.");
-        } else {
-          setUploadError(errData.error || `Upload failed (Status ${res.status}). Admin authorization required.`);
-        }
+      const formData = new FormData();
+      formData.append("file", item.file);
+      formData.append("title", item.title.trim() || item.file.name.replace(/\.[^/.]+$/, ""));
+      formData.append("subjectId", String(uploadSubjectId));
+      formData.append("category", item.category);
+      if (uploadDescription.trim()) {
+        formData.append("description", uploadDescription.trim());
       }
-    } catch {
-      setUploadError("Network error while uploading document.");
-    } finally {
-      setUploading(false);
+
+      try {
+        const res = await fetch(`${API}/vault`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+
+        if (res.ok) {
+          const created: VaultDoc = await res.json();
+          // Add successfully uploaded item immediately to items list state without page reload
+          setItems((prev) => [created, ...prev]);
+          setUploadQueue((prev) =>
+            prev.map((q) => (q.id === item.id ? { ...q, status: "done" } : q))
+          );
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg =
+            res.status === 413
+              ? (errData.error || "File size exceeds 50 MB server limit.")
+              : (errData.error || `Upload failed (${res.status}).`);
+          setUploadQueue((prev) =>
+            prev.map((q) => (q.id === item.id ? { ...q, status: "failed", errorMessage: errMsg } : q))
+          );
+        }
+      } catch (err: any) {
+        setUploadQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, status: "failed", errorMessage: "Network error during upload." } : q))
+        );
+      }
     }
+
+    setUploading(false);
   };
 
   const closeUploadModal = () => {
+    if (uploading) {
+      if (!confirm("An upload is currently in progress. Are you sure you want to stop and close?")) {
+        return;
+      }
+    }
     setUploadModalOpen(false);
-    setUploadTitle("");
-    setUploadCategory("pdf");
+    setUploadQueue([]);
+    setRejectedFiles([]);
+    setUploadSubjectId("");
     setUploadDescription("");
-    setUploadFile(null);
-    setUploadFilePreview(null);
     setUploadError("");
     setUploadNotice("");
     setIsUploadDragging(false);
@@ -844,6 +947,25 @@ export function AdminVaultPage() {
       fileInputRef.current.value = "";
     }
   };
+
+  const totalQueueBytes = useMemo(() => {
+    return uploadQueue.reduce((acc, item) => acc + item.file.size, 0);
+  }, [uploadQueue]);
+
+  const totalQueueSizeFormatted = useMemo(() => {
+    if (totalQueueBytes > 1024 * 1024) {
+      return `${(totalQueueBytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${Math.round(totalQueueBytes / 1024)} KB`;
+  }, [totalQueueBytes]);
+
+  const doneCount = useMemo(() => {
+    return uploadQueue.filter((q) => q.status === "done").length;
+  }, [uploadQueue]);
+
+  const failedCount = useMemo(() => {
+    return uploadQueue.filter((q) => q.status === "failed").length;
+  }, [uploadQueue]);
 
   // Delete item
   const handleDeleteItem = async (id: number | string) => {
@@ -1250,51 +1372,94 @@ export function AdminVaultPage() {
           </div>
         )}
 
-        {/* ─── UPLOAD MODAL ─── */}
+        {/* ─── UPLOAD MODAL (BATCH MULTI-FILE SUPPORT) ─── */}
         {uploadModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl relative">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
+            <div className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl relative overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-2.5">
                   <span className="text-xl">📤</span>
-                  <h3 className="text-base font-bold text-white">Upload to Vault (Admin)</h3>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Upload to Vault (Batch Admin)</h3>
+                    <p className="text-[11px] text-slate-400">Queue up to 20 files for sequential upload to Supabase Storage</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={closeUploadModal}
-                  className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
+                  disabled={uploading}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 disabled:opacity-40 text-xs font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              <form onSubmit={handleUploadSubmit} className="flex flex-col gap-3.5 mt-4">
+              {/* Scrollable Body */}
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                {/* Global Error Notice */}
                 {uploadError && (
-                  <div className="p-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-300">
-                    {uploadError}
+                  <div className="p-3 rounded-xl text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-300 flex items-start gap-2">
+                    <span>⚠️</span>
+                    <span className="flex-1">{uploadError}</span>
                   </div>
                 )}
 
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Document Title</label>
-                  <input
-                    type="text"
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="e.g., Chapter 4 Cryptography Lecture Slides"
-                    className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
-                  />
-                </div>
+                {/* Queue Notice / Advisory */}
+                {uploadNotice && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2">
+                    <span>ℹ️</span>
+                    <span className="flex-1">{uploadNotice}</span>
+                  </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Batch Status Summary: Failed Retry */}
+                {failedCount > 0 && !uploading && (
+                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span>❌</span>
+                      <span><strong>{failedCount}</strong> of {uploadQueue.length} file(s) failed to upload.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleStartBatchUpload(true)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow transition-all"
+                    >
+                      Retry Failed ({failedCount})
+                    </button>
+                  </div>
+                )}
+
+                {/* Batch Status Summary: All Done */}
+                {doneCount > 0 && doneCount === uploadQueue.length && !uploading && (
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span>✅</span>
+                      <span>All <strong>{doneCount}</strong> files successfully uploaded and published to the Vault!</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeUploadModal}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+
+                {/* Batch Common Metadata Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-1">Target Subject</label>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">
+                      Target Subject <span className="text-rose-400">*</span>
+                    </label>
                     <select
                       value={uploadSubjectId}
-                      onChange={(e) => setUploadSubjectId(Number(e.target.value))}
-                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
+                      onChange={(e) => setUploadSubjectId(e.target.value ? Number(e.target.value) : "")}
+                      disabled={uploading}
+                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500 disabled:opacity-50"
                     >
-                      <option value="">Select subject…</option>
+                      <option value="">Select subject for batch…</option>
                       {subjects.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name} (Sem {s.sem})
@@ -1304,99 +1469,287 @@ export function AdminVaultPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-1">Category</label>
-                    <select
-                      value={uploadCategory}
-                      onChange={(e) => setUploadCategory(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
-                    >
-                      <option value="pdf">📑 PDF / Slides</option>
-                      <option value="handwritten">✍️ Handwritten Notes</option>
-                      <option value="notes">📝 Lecture Notes</option>
-                      <option value="summary">⚡ Exam Summary</option>
-                      <option value="other">📂 Other</option>
-                    </select>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">
+                      Description / Key Notes <span className="text-slate-500 text-[10px] font-normal">(applies to batch)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadDescription}
+                      onChange={(e) => setUploadDescription(e.target.value)}
+                      disabled={uploading}
+                      placeholder="Optional notes, covered topics, exam pointers..."
+                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500 disabled:opacity-50"
+                    />
                   </div>
                 </div>
 
+                {/* Dropzone & File Input */}
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Description / Key Notes</label>
-                  <textarea
-                    rows={2}
-                    value={uploadDescription}
-                    onChange={(e) => setUploadDescription(e.target.value)}
-                    placeholder="Optional tips, covered topics, exam pointers..."
-                    className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500 resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Select File (PDF, Slides, Word, Image)</label>
                   <input
                     type="file"
+                    multiple
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx"
+                    disabled={uploading || uploadQueue.length >= 20}
                     className="hidden"
                   />
-                  <div
-                    onDragEnter={handleUploadDragEnter}
-                    onDragOver={handleUploadDragOver}
-                    onDragLeave={handleUploadDragLeave}
-                    onDrop={handleUploadDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`p-5 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-                      isUploadDragging
-                        ? "border-indigo-400 bg-indigo-500/20 scale-[1.01]"
-                        : "border-slate-700 hover:border-indigo-500 bg-slate-800/40"
-                    }`}
-                  >
-                    {uploadFile ? (
-                      <div>
-                        <span className="text-xl block mb-0.5">📄</span>
-                        <p className="text-xs font-bold text-white">{uploadFile.name}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {uploadFile.size > 1024 * 1024
-                            ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
-                            : `${(uploadFile.size / 1024).toFixed(1)} KB`}{" "}
-                          • Click or drop to choose a different file
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="text-xl block mb-0.5">{isUploadDragging ? "📥" : "☁️"}</span>
-                        <p className="text-xs font-bold text-white">
-                          {isUploadDragging ? "Drop file here" : "Click to browse or drop file"}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Supports PDF documents, slides (.ppt, .pptx), Word notes, and images (up to 50 MB)</p>
-                      </div>
-                    )}
-                  </div>
-                  {uploadNotice && (
-                    <div className="mt-2 p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1.5">
-                      <span>ℹ️</span>
-                      <span>{uploadNotice}</span>
+
+                  {uploadQueue.length === 0 ? (
+                    <div
+                      onDragEnter={handleUploadDragEnter}
+                      onDragOver={handleUploadDragOver}
+                      onDragLeave={handleUploadDragLeave}
+                      onDrop={handleUploadDrop}
+                      onClick={() => !uploading && fileInputRef.current?.click()}
+                      className={`p-7 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                        isUploadDragging
+                          ? "border-indigo-400 bg-indigo-500/20 scale-[1.01]"
+                          : "border-slate-700 hover:border-indigo-500 bg-slate-800/40"
+                      }`}
+                    >
+                      <span className="text-3xl block mb-1.5">{isUploadDragging ? "📥" : "☁️"}</span>
+                      <p className="text-xs font-bold text-white">
+                        {isUploadDragging ? "Drop files here to queue" : "Click to browse or drop files here"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1 max-w-sm">
+                        Select multiple files (up to 20 per batch). Supports PDF documents, slides (.ppt, .pptx), Word notes, and images (up to 50 MB each).
+                      </p>
                     </div>
+                  ) : (
+                    uploadQueue.length < 20 && (
+                      <div
+                        onDragEnter={handleUploadDragEnter}
+                        onDragOver={handleUploadDragOver}
+                        onDragLeave={handleUploadDragLeave}
+                        onDrop={handleUploadDrop}
+                        onClick={() => !uploading && fileInputRef.current?.click()}
+                        className={`p-3 border-2 border-dashed rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all text-xs font-semibold ${
+                          isUploadDragging
+                            ? "border-indigo-400 bg-indigo-500/20 text-indigo-300"
+                            : "border-slate-700 hover:border-indigo-500 bg-slate-800/30 text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        <span>{isUploadDragging ? "📥" : "➕"}</span>
+                        <span>
+                          {isUploadDragging
+                            ? "Drop more files here"
+                            : `Click or drop more files to add (${uploadQueue.length}/20 queued)`}
+                        </span>
+                      </div>
+                    )
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                {/* Rejected Files Card (if any file failed validation) */}
+                {rejectedFiles.length > 0 && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+                    <div className="flex items-center justify-between mb-1.5 font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <span>⚠️</span>
+                        <span>{rejectedFiles.length} file(s) skipped (validation failed):</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRejectedFiles([])}
+                        className="text-[10px] text-amber-400 hover:text-amber-200 underline font-normal"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                      {rejectedFiles.map((rf, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px] bg-slate-900/60 px-2 py-1 rounded">
+                          <span className="truncate max-w-[240px] font-mono text-slate-300">{rf.name}</span>
+                          <span className="text-amber-400 text-[10px]">{rf.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Queued Files List */}
+                {uploadQueue.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-300 px-0.5">
+                      <span>Files in Queue ({uploadQueue.length})</span>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Total: <strong className="text-indigo-400 font-semibold">{totalQueueSizeFormatted}</strong>
+                        {doneCount > 0 && ` • ${doneCount} uploaded`}
+                      </span>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                      {uploadQueue.map((item) => {
+                        const sizeStr =
+                          item.file.size > 1024 * 1024
+                            ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB`
+                            : `${Math.round(item.file.size / 1024)} KB`;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`p-3 rounded-xl border transition-all ${
+                              item.status === "uploading"
+                                ? "border-indigo-500 bg-indigo-950/30 ring-1 ring-indigo-500/50"
+                                : item.status === "done"
+                                ? "border-emerald-500/50 bg-emerald-950/20"
+                                : item.status === "failed"
+                                ? "border-rose-500/50 bg-rose-950/20"
+                                : "border-slate-800 bg-slate-800/40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0">
+                                  {item.status === "done"
+                                    ? "✅"
+                                    : item.status === "failed"
+                                    ? "❌"
+                                    : item.status === "uploading"
+                                    ? "⏳"
+                                    : "📄"}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-white truncate max-w-[280px]" title={item.file.name}>
+                                    {item.file.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400">{sizeStr}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {/* Status Badge */}
+                                {item.status === "waiting" && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-300">
+                                    Waiting
+                                  </span>
+                                )}
+                                {item.status === "uploading" && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                                    Uploading…
+                                  </span>
+                                )}
+                                {item.status === "done" && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                                    Uploaded ✓
+                                  </span>
+                                )}
+                                {item.status === "failed" && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">
+                                    Failed
+                                  </span>
+                                )}
+
+                                {/* Remove Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => removeQueueItem(item.id)}
+                                  disabled={uploading && item.status === "uploading"}
+                                  className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-300 hover:bg-slate-700 disabled:opacity-30 transition-colors text-xs"
+                                  title="Remove from queue"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Duplicate warning */}
+                            {item.isDuplicateWarn && (
+                              <div className="mb-2 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-md flex items-center gap-1">
+                                <span>⚠️</span>
+                                <span>Duplicate notice: A file with this name & size already exists in the Vault or queue.</span>
+                              </div>
+                            )}
+
+                            {/* Error message */}
+                            {item.status === "failed" && item.errorMessage && (
+                              <div className="mb-2 text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-1 rounded-md">
+                                Error: {item.errorMessage}
+                              </div>
+                            )}
+
+                            {/* Editable inputs row */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-800/80">
+                              <div className="sm:col-span-2">
+                                <input
+                                  type="text"
+                                  value={item.title}
+                                  onChange={(e) => updateQueueItem(item.id, { title: e.target.value })}
+                                  disabled={uploading || item.status === "done"}
+                                  placeholder="Document title"
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-xs outline-none bg-slate-900 border border-slate-700 text-white focus:border-indigo-500 disabled:opacity-50"
+                                />
+                              </div>
+                              <div>
+                                <select
+                                  value={item.category}
+                                  onChange={(e) => updateQueueItem(item.id, { category: e.target.value as any })}
+                                  disabled={uploading || item.status === "done"}
+                                  className="w-full px-2 py-1.5 rounded-lg text-xs outline-none bg-slate-900 border border-slate-700 text-white focus:border-indigo-500 disabled:opacity-50"
+                                >
+                                  <option value="pdf">📑 PDF / Slides</option>
+                                  <option value="handwritten">✍️ Handwritten Notes</option>
+                                  <option value="notes">📝 Lecture Notes</option>
+                                  <option value="summary">⚡ Exam Summary</option>
+                                  <option value="other">📂 Other</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-slate-900/80 shrink-0">
+                <div className="text-xs text-slate-400">
+                  {uploadQueue.length > 0 ? (
+                    <span>
+                      <strong className="text-white">{uploadQueue.length}</strong> {uploadQueue.length === 1 ? "file" : "files"}
+                      {" "}(<strong className="text-white">{totalQueueSizeFormatted}</strong>)
+                      {doneCount > 0 && (
+                        <span className="text-emerald-400 font-semibold ml-1.5">• {doneCount} of {uploadQueue.length} uploaded</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Queue is empty (max 20 files)</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={closeUploadModal}
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-800"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                   >
-                    Cancel
+                    {doneCount === uploadQueue.length && uploadQueue.length > 0 ? "Close" : "Cancel"}
                   </button>
                   <button
-                    type="submit"
-                    disabled={uploading}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+                    type="button"
+                    onClick={() => handleStartBatchUpload(false)}
+                    disabled={uploading || uploadQueue.length === 0 || !uploadSubjectId || doneCount === uploadQueue.length}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shadow transition-all flex items-center gap-1.5"
                   >
-                    {uploading ? "Publishing to Vault…" : "Publish Material"}
+                    {uploading ? (
+                      <>
+                        <span className="text-xs">⏳</span>
+                        <span>Uploading ({doneCount + 1}/{uploadQueue.length})…</span>
+                      </>
+                    ) : doneCount === uploadQueue.length && uploadQueue.length > 0 ? (
+                      <span>All Uploaded ✓</span>
+                    ) : (
+                      <span>
+                        Upload {uploadQueue.length > 0 ? (uploadQueue.length === 1 ? "1 File" : `All (${uploadQueue.length - doneCount} Files)`) : "Files"}
+                      </span>
+                    )}
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
