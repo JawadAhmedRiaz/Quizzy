@@ -19,12 +19,14 @@ interface VaultDoc {
   title: string;
   category: "pdf" | "handwritten" | "notes" | "summary" | "other";
   description?: string;
-  fileUrl: string;
+  fileUrl?: string;
   fileName: string;
   fileSize?: string;
   mimeType?: string;
   tags?: string[];
   createdAt: string;
+  updatedAt?: string;
+  isLegacy?: boolean;
 }
 
 const CATEGORIES = [
@@ -61,7 +63,96 @@ export function AdminVaultPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [previewDoc, setPreviewDoc] = useState<VaultDoc | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fetch signed URL whenever a document is selected for preview
+  useEffect(() => {
+    if (!previewDoc) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    if (previewDoc.fileUrl) {
+      setPreviewUrl(previewDoc.fileUrl);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewUrl(null);
+
+    fetch(`${API}/vault/${previewDoc.id}/file-url`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to load document link.");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (isMounted) {
+          setPreviewUrl(data.url);
+          setPreviewLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setPreviewError(err.message || "Network error loading document link.");
+          setPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDoc]);
+
+  // Handle direct download from card
+  const handleDirectDownload = async (doc: VaultDoc, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (doc.fileUrl) {
+      const a = document.createElement("a");
+      a.href = doc.fileUrl;
+      a.download = doc.fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    setDownloadingId(doc.id);
+    try {
+      const res = await fetch(`${API}/vault/${doc.id}/file-url`, { credentials: "include" });
+      if (!res.ok) {
+        alert("Unable to generate download link.");
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        const a = document.createElement("a");
+        a.href = data.url;
+        a.download = data.fileName || doc.fileName;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch {
+      alert("Network error while preparing download.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -269,20 +360,17 @@ export function AdminVaultPage() {
       const cleanName = file.name.replace(/\.[^/.]+$/, "");
       setUploadTitle(cleanName);
     }
-    if (file.name.toLowerCase().endsWith(".pdf")) {
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith(".pdf") || lowerName.endsWith(".ppt") || lowerName.endsWith(".pptx")) {
       setUploadCategory("pdf");
     } else if (file.type.startsWith("image/")) {
       setUploadCategory("handwritten");
+    } else if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+      setUploadCategory("notes");
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setUploadFilePreview(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
-  // Handle upload submit
+  // Handle upload submit (multipart/form-data for Supabase Storage)
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploadError("");
@@ -295,37 +383,27 @@ export function AdminVaultPage() {
       setUploadError("Please select a subject.");
       return;
     }
-    if (!uploadFile && !uploadFilePreview) {
+    if (!uploadFile) {
       setUploadError("Please choose a file to upload.");
       return;
     }
 
     setUploading(true);
 
-    const sizeFormatted = uploadFile
-      ? uploadFile.size > 1024 * 1024
-        ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
-        : `${Math.round(uploadFile.size / 1024)} KB`
-      : "1.2 MB";
-
-    const payload = {
-      subjectId: Number(uploadSubjectId),
-      title: uploadTitle.trim(),
-      category: uploadCategory,
-      description: uploadDescription.trim() || undefined,
-      fileUrl: uploadFilePreview || "",
-      fileName: uploadFile?.name || "document.pdf",
-      fileSize: sizeFormatted,
-      mimeType: uploadFile?.type || "application/pdf",
-      tags: [uploadCategory, subjects.find((s) => s.id === Number(uploadSubjectId))?.name || "Study"],
-    };
+    const formData = new FormData();
+    formData.append("file", uploadFile);
+    formData.append("title", uploadTitle.trim());
+    formData.append("subjectId", String(uploadSubjectId));
+    formData.append("category", uploadCategory);
+    if (uploadDescription.trim()) {
+      formData.append("description", uploadDescription.trim());
+    }
 
     try {
       const res = await fetch(`${API}/vault`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (res.ok) {
@@ -351,6 +429,9 @@ export function AdminVaultPage() {
     setUploadFile(null);
     setUploadFilePreview(null);
     setUploadError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // Delete item
@@ -723,14 +804,15 @@ export function AdminVaultPage() {
                         Preview
                       </button>
 
-                      <a
-                        href={item.fileUrl}
-                        download={item.fileName}
-                        className="px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 font-semibold"
+                      <button
+                        type="button"
+                        onClick={(e) => handleDirectDownload(item, e)}
+                        disabled={downloadingId === item.id}
+                        className="px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 font-semibold disabled:opacity-50"
                         title="Download"
                       >
-                        Download
-                      </a>
+                        {downloadingId === item.id ? "..." : "Download"}
+                      </button>
 
                       <button
                         type="button"
@@ -829,12 +911,12 @@ export function AdminVaultPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Select File (PDF or Image)</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Select File (PDF, Slides, Word, Image)</label>
                   <input
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx"
                     className="hidden"
                   />
                   <div
@@ -846,14 +928,17 @@ export function AdminVaultPage() {
                         <span className="text-xl block mb-0.5">📄</span>
                         <p className="text-xs font-bold text-white">{uploadFile.name}</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {(uploadFile.size / 1024).toFixed(1)} KB • Click to choose a different file
+                          {uploadFile.size > 1024 * 1024
+                            ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
+                            : `${(uploadFile.size / 1024).toFixed(1)} KB`}{" "}
+                          • Click to choose a different file
                         </p>
                       </div>
                     ) : (
                       <div>
                         <span className="text-xl block mb-0.5">☁️</span>
                         <p className="text-xs font-bold text-white">Click to browse or drop file</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Supports PDF documents and camera images</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Supports PDF documents, slides (.ppt, .pptx), Word notes, and images (up to 50 MB)</p>
                       </div>
                     )}
                   </div>
@@ -1075,24 +1160,30 @@ export function AdminVaultPage() {
                     <span className="hidden sm:inline">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
                   </button>
 
-                  <a
-                    href={previewDoc.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow flex items-center gap-1.5 transition-all"
-                    title="Open in new window"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">New Tab</span>
-                  </a>
+                  {previewUrl && (
+                    <a
+                      href={previewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow flex items-center gap-1.5 transition-all"
+                      title="Open in new window"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">New Tab</span>
+                    </a>
+                  )}
 
-                  <a
-                    href={previewDoc.fileUrl}
-                    download={previewDoc.fileName}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
-                  >
-                    Download
-                  </a>
+                  {previewUrl && (
+                    <a
+                      href={previewUrl}
+                      download={previewDoc.fileName}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+                    >
+                      Download
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1110,31 +1201,64 @@ export function AdminVaultPage() {
               <div className={`flex-1 my-3 overflow-hidden rounded-xl bg-slate-950 flex flex-col items-center justify-center ${
                 isFullscreen ? "h-[calc(100vh-140px)] max-h-none p-2" : "max-h-[60vh] p-4 overflow-y-auto"
               }`}>
-                {previewDoc.fileUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") ? (
-                  <img
-                    src={previewDoc.fileUrl}
-                    alt={previewDoc.title}
-                    className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-lg shadow`}
-                  />
-                ) : previewDoc.fileUrl.startsWith("data:application/pdf") || previewDoc.fileName.endsWith(".pdf") ? (
-                  <iframe
-                    src={previewDoc.fileUrl}
-                    title={previewDoc.title}
-                    className={`w-full rounded-lg border border-slate-800 ${isFullscreen ? "h-full" : "h-[50vh]"}`}
-                  />
-                ) : (
-                  <div className="text-center p-8">
-                    <span className="text-5xl block mb-2">📄</span>
-                    <p className="text-xs font-bold text-white">{previewDoc.fileName}</p>
-                    <a
-                      href={previewDoc.fileUrl}
-                      download={previewDoc.fileName}
-                      className="mt-3 inline-block px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600"
-                    >
-                      Download & Open
-                    </a>
+                {previewLoading ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+                    <p className="text-xs font-bold text-slate-400">Preparing secure document link...</p>
                   </div>
-                )}
+                ) : previewError ? (
+                  <div className="py-12 px-6 flex flex-col items-center justify-center text-center">
+                    <span className="text-3xl mb-2">⚠️</span>
+                    <p className="text-sm font-bold text-white mb-1">Unable to Load Preview</p>
+                    <p className="text-xs text-slate-400 max-w-sm mb-4 leading-relaxed">{previewError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDoc({ ...previewDoc })}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : previewUrl ? (
+                  previewUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(previewDoc.fileName) ? (
+                    <img
+                      src={previewUrl}
+                      alt={previewDoc.title}
+                      className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-lg shadow`}
+                    />
+                  ) : previewUrl.startsWith("data:application/pdf") || previewDoc.fileName.toLowerCase().endsWith(".pdf") || previewDoc.mimeType === "application/pdf" ? (
+                    <iframe
+                      src={previewUrl}
+                      title={previewDoc.title}
+                      className={`w-full rounded-lg border border-slate-800 ${isFullscreen ? "h-full" : "h-[50vh]"}`}
+                    />
+                  ) : (
+                    <div className="text-center p-8 flex flex-col items-center justify-center">
+                      <span className="text-5xl block mb-2">
+                        {/\.(pptx?|ppsx?)$/i.test(previewDoc.fileName)
+                          ? "📊"
+                          : /\.(docx?|rtf)$/i.test(previewDoc.fileName)
+                          ? "📝"
+                          : "📄"}
+                      </span>
+                      <p className="text-xs font-bold text-white mb-1">{previewDoc.fileName}</p>
+                      <p className="text-[11px] text-slate-400 max-w-sm mb-3">
+                        {/\.(pptx?|ppsx?|docx?|xlsx?)$/i.test(previewDoc.fileName)
+                          ? "Office documents (.docx, .pptx) cannot be rendered directly in the browser tab. Download to view."
+                          : `Stored in Study Vault (${previewDoc.fileSize || "File ready"})`}
+                      </p>
+                      <a
+                        href={previewUrl}
+                        download={previewDoc.fileName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+                      >
+                        Download & Open
+                      </a>
+                    </div>
+                  )
+                ) : null}
               </div>
 
               {previewDoc.description && !isFullscreen && (

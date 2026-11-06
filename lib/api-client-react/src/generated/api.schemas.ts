@@ -140,6 +140,32 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+export interface VaultItem {
+  id: number;
+  userId: string;
+  subjectId: number;
+  title: string;
+  category: string;
+  /** @nullable */
+  description?: string | null;
+  tags: string[];
+  fileName: string;
+  /** @nullable */
+  fileSize?: string | null;
+  /** @nullable */
+  mimeType?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isLegacy: boolean;
+}
+
+export interface VaultFileUrlResponse {
+  url: string;
+  fileName: string;
+  mimeType: string;
+  isLegacy: boolean;
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */
@@ -166,4 +192,9 @@ export type HandleBrowserLoginCallbackParams = {
   code?: string;
   state?: string;
   iss?: string;
+};
+
+export type GetVaultItemsParams = {
+  subjectId?: number;
+  category?: string;
 };

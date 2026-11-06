@@ -23,6 +23,7 @@ import type {
   ErrorEnvelope,
   GetQuizLeaderboardParams,
   GetUserAnalyticsParams,
+  GetVaultItemsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   LeaderboardEntry,
@@ -35,6 +36,8 @@ import type {
   SubmitQuizReportBody,
   SubmitScoreBody,
   UserAnalytics,
+  VaultFileUrlResponse,
+  VaultItem,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1257,3 +1260,184 @@ export const useLogoutMobileSession = <
 > => {
   return useMutation(getLogoutMobileSessionMutationOptions(options));
 };
+
+/**
+ * @summary Get lightweight list of vault study documents
+ */
+export const getGetVaultItemsUrl = (params?: GetVaultItemsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/vault?${stringifiedParams}`
+    : `/api/vault`;
+};
+
+export const getVaultItems = async (
+  params?: GetVaultItemsParams,
+  options?: RequestInit,
+): Promise<VaultItem[]> => {
+  return customFetch<VaultItem[]>(getGetVaultItemsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVaultItemsQueryKey = (params?: GetVaultItemsParams) => {
+  return [`/api/vault`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetVaultItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVaultItems>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  params?: GetVaultItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVaultItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVaultItemsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getVaultItems>>> = ({
+    signal,
+  }) => getVaultItems(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVaultItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVaultItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVaultItems>>
+>;
+export type GetVaultItemsQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Get lightweight list of vault study documents
+ */
+
+export function useGetVaultItems<
+  TData = Awaited<ReturnType<typeof getVaultItems>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  params?: GetVaultItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVaultItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVaultItemsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get download or preview URL for a vault document
+ */
+export const getGetVaultFileUrlUrl = (id: number) => {
+  return `/api/vault/${id}/file-url`;
+};
+
+export const getVaultFileUrl = async (
+  id: number,
+  options?: RequestInit,
+): Promise<VaultFileUrlResponse> => {
+  return customFetch<VaultFileUrlResponse>(getGetVaultFileUrlUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVaultFileUrlQueryKey = (id: number) => {
+  return [`/api/vault/${id}/file-url`] as const;
+};
+
+export const getGetVaultFileUrlQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVaultFileUrl>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVaultFileUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVaultFileUrlQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getVaultFileUrl>>> = ({
+    signal,
+  }) => getVaultFileUrl(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVaultFileUrl>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVaultFileUrlQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVaultFileUrl>>
+>;
+export type GetVaultFileUrlQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Get download or preview URL for a vault document
+ */
+
+export function useGetVaultFileUrl<
+  TData = Awaited<ReturnType<typeof getVaultFileUrl>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVaultFileUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVaultFileUrlQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

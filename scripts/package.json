@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.119.0",
     "@workspace/db": "workspace:*",
     "pg": "^8.20.0"
   },

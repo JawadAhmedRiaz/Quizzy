@@ -7,7 +7,8 @@ export const vaultItemsTable = pgTable("vault_items", {
   title: text("title").notNull(),
   category: text("category").notNull().default("pdf"), // 'pdf' | 'handwritten' | 'notes' | 'summary' | 'other'
   description: text("description"),
-  fileUrl: text("file_url").notNull(), // Data URI or URL
+  fileUrl: text("file_url"), // Data URI or URL for legacy rows (nullable)
+  storagePath: text("storage_path"), // Supabase Storage path (<uuid>.<ext>) (nullable)
   fileName: text("file_name").notNull(),
   fileSize: text("file_size"),
   mimeType: text("mime_type"),

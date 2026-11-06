@@ -15,6 +15,8 @@ tags:
     description: Per-quiz reports, leaderboard, and analytics
   - name: Auth
     description: Browser and mobile authentication endpoints.
+  - name: vault
+    description: Study vault operations
 paths:
   /healthz:
     get:
@@ -282,6 +284,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogoutSuccess'
+
+  /vault:
+    get:
+      operationId: getVaultItems
+      tags: [vault]
+      summary: Get lightweight list of vault study documents
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of vault items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VaultItem'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Access restricted to administrators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /vault/{id}/file-url:
+    get:
+      operationId: getVaultFileUrl
+      tags: [vault]
+      summary: Get download or preview URL for a vault document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: File URL result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultFileUrlResponse'
+        '400':
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Access restricted to administrators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Item or file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
 components:
   parameters:
@@ -558,3 +641,49 @@ components:
       properties:
         error:
           type: string
+
+    VaultItem:
+      type: object
+      required: [id, userId, subjectId, title, category, tags, fileName, createdAt, updatedAt, isLegacy]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        subjectId:
+          type: integer
+        title:
+          type: string
+        category:
+          type: string
+        description:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        fileName:
+          type: string
+        fileSize:
+          type: [string, 'null']
+        mimeType:
+          type: [string, 'null']
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        isLegacy:
+          type: boolean
+
+    VaultFileUrlResponse:
+      type: object
+      required: [url, fileName, mimeType, isLegacy]
+      properties:
+        url:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        isLegacy:
+          type: boolean

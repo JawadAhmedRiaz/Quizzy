@@ -24,13 +24,14 @@ export interface VaultDoc {
   title: string;
   category: "pdf" | "handwritten" | "notes" | "summary" | "other";
   description?: string;
-  fileUrl: string;
+  fileUrl?: string;
   fileName: string;
   fileSize?: string;
   mimeType?: string;
   tags?: string[];
   createdAt: string;
   updatedAt?: string;
+  isLegacy?: boolean;
 }
 
 const CATEGORIES = [
@@ -57,9 +58,105 @@ export function VaultPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Modal state (Only preview allowed here; all upload options removed outside admin dashboard)
+  // Modal & File Loading state
   const [previewDoc, setPreviewDoc] = useState<VaultDoc | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fetch signed URL whenever a document is selected for preview
+  useEffect(() => {
+    if (!previewDoc) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    if (previewDoc.fileUrl) {
+      setPreviewUrl(previewDoc.fileUrl);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewUrl(null);
+
+    fetch(`${API}/vault/${previewDoc.id}/file-url`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            throw new Error("Access restricted. Please sign in with an authorized student account.");
+          }
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to load document link.");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (isMounted) {
+          setPreviewUrl(data.url);
+          setPreviewLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setPreviewError(err.message || "Network error loading document link.");
+          setPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDoc]);
+
+  // Handle direct download from card without opening preview modal
+  const handleDirectDownload = async (doc: VaultDoc, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (doc.fileUrl) {
+      const a = document.createElement("a");
+      a.href = doc.fileUrl;
+      a.download = doc.fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    setDownloadingId(doc.id);
+    try {
+      const res = await fetch(`${API}/vault/${doc.id}/file-url`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          alert("This document is restricted. Please sign in with an authorized student account.");
+        } else {
+          alert("Unable to generate download link. Please try again.");
+        }
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        const a = document.createElement("a");
+        a.href = data.url;
+        a.download = data.fileName || doc.fileName;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch {
+      alert("Network error while preparing download.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Close or exit fullscreen on Escape
   useEffect(() => {
@@ -506,15 +603,15 @@ export function VaultPage() {
                           👁️
                         </button>
 
-                        <a
-                          href={item.fileUrl}
-                          download={item.fileName}
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        <button
+                          type="button"
+                          onClick={(e) => handleDirectDownload(item, e)}
+                          disabled={downloadingId === item.id}
+                          className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                           title="Download"
                         >
-                          ⬇️
-                        </a>
+                          {downloadingId === item.id ? "⏳" : "⬇️"}
+                        </button>
                       </div>
                     </div>
                   </motion.div>
@@ -591,26 +688,32 @@ export function VaultPage() {
                     </button>
 
                     {/* Open in new tab */}
-                    <a
-                      href={previewDoc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-foreground bg-muted hover:bg-muted/80 border border-border shadow flex items-center gap-1.5 transition-all"
-                      title="Open in new window"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">New Tab</span>
-                    </a>
+                    {previewUrl && (
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-foreground bg-muted hover:bg-muted/80 border border-border shadow flex items-center gap-1.5 transition-all"
+                        title="Open in new window"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">New Tab</span>
+                      </a>
+                    )}
 
                     {/* Download button */}
-                    <a
-                      href={previewDoc.fileUrl}
-                      download={previewDoc.fileName}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1.5"
-                    >
-                      <span>⬇️</span>
-                      <span className="hidden sm:inline">Download</span>
-                    </a>
+                    {previewUrl && (
+                      <a
+                        href={previewUrl}
+                        download={previewDoc.fileName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1.5"
+                      >
+                        <span>⬇️</span>
+                        <span className="hidden sm:inline">Download</span>
+                      </a>
+                    )}
 
                     {/* Close button */}
                     <button
@@ -633,34 +736,67 @@ export function VaultPage() {
                     isFullscreen ? "h-[calc(100vh-140px)] max-h-none p-2" : "max-h-[60vh] p-4 overflow-y-auto"
                   }`}
                 >
-                  {previewDoc.fileUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") ? (
-                    <img
-                      src={previewDoc.fileUrl}
-                      alt={previewDoc.title}
-                      className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-xl shadow`}
-                    />
-                  ) : previewDoc.fileUrl.startsWith("data:application/pdf") || previewDoc.fileName.endsWith(".pdf") ? (
-                    <iframe
-                      src={previewDoc.fileUrl}
-                      title={previewDoc.title}
-                      className={`w-full rounded-xl border border-border ${isFullscreen ? "h-full" : "h-[50vh]"}`}
-                    />
-                  ) : (
-                    <div className="text-center p-8">
-                      <span className="text-5xl block mb-3">📄</span>
-                      <p className="text-sm font-bold text-foreground mb-1">{previewDoc.fileName}</p>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Stored in Study Vault ({previewDoc.fileSize || "File available"})
-                      </p>
-                      <a
-                        href={previewDoc.fileUrl}
-                        download={previewDoc.fileName}
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow inline-flex items-center gap-1.5"
-                      >
-                        <span>⬇️ Download & Open</span>
-                      </a>
+                  {previewLoading ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-xs font-bold text-muted-foreground">Preparing secure document link...</p>
                     </div>
-                  )}
+                  ) : previewError ? (
+                    <div className="py-12 px-6 flex flex-col items-center justify-center text-center">
+                      <span className="text-3xl mb-2">🔒</span>
+                      <p className="text-sm font-bold text-foreground mb-1">Access Restricted</p>
+                      <p className="text-xs text-muted-foreground max-w-sm mb-4 leading-relaxed">{previewError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc({ ...previewDoc })}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow transition-all hover:scale-105"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : previewUrl ? (
+                    previewUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(previewDoc.fileName) ? (
+                      <img
+                        src={previewUrl}
+                        alt={previewDoc.title}
+                        className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-xl shadow`}
+                      />
+                    ) : previewUrl.startsWith("data:application/pdf") || previewDoc.fileName.toLowerCase().endsWith(".pdf") || previewDoc.mimeType === "application/pdf" ? (
+                      <iframe
+                        src={previewUrl}
+                        title={previewDoc.title}
+                        className={`w-full rounded-xl border border-border ${isFullscreen ? "h-full" : "h-[50vh]"}`}
+                      />
+                    ) : (
+                      <div className="text-center p-8 flex flex-col items-center justify-center">
+                        <span className="text-5xl block mb-3">
+                          {/\.(pptx?|ppsx?)$/i.test(previewDoc.fileName)
+                            ? "📊"
+                            : /\.(docx?|rtf)$/i.test(previewDoc.fileName)
+                            ? "📝"
+                            : "📄"}
+                        </span>
+                        <p className="text-sm font-bold text-foreground mb-1">{previewDoc.fileName}</p>
+                        <p className="text-xs text-muted-foreground max-w-md mb-2">
+                          {/\.(pptx?|ppsx?|docx?|xlsx?)$/i.test(previewDoc.fileName)
+                            ? "Office documents (.docx, .pptx) cannot be rendered directly in the browser tab. Download to view in Microsoft Office or Google Docs."
+                            : `Stored in Study Vault (${previewDoc.fileSize || "File available"})`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mb-4">
+                          File size: {previewDoc.fileSize || "Ready"}
+                        </p>
+                        <a
+                          href={previewUrl}
+                          download={previewDoc.fileName}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow inline-flex items-center gap-1.5 transition-all hover:scale-105"
+                        >
+                          <span>⬇️ Download & Open</span>
+                        </a>
+                      </div>
+                    )
+                  ) : null}
                 </div>
 
                 {/* Footer notes */}

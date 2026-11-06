@@ -244,3 +244,42 @@ export const LogoutMobileSessionHeader = zod.object({
 export const LogoutMobileSessionResponse = zod.object({
   success: zod.boolean(),
 });
+
+/**
+ * @summary Get lightweight list of vault study documents
+ */
+export const GetVaultItemsQueryParams = zod.object({
+  subjectId: zod.coerce.number().optional(),
+  category: zod.coerce.string().optional(),
+});
+
+export const GetVaultItemsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  subjectId: zod.number(),
+  title: zod.string(),
+  category: zod.string(),
+  description: zod.string().nullish(),
+  tags: zod.array(zod.string()),
+  fileName: zod.string(),
+  fileSize: zod.string().nullish(),
+  mimeType: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  isLegacy: zod.boolean(),
+});
+export const GetVaultItemsResponse = zod.array(GetVaultItemsResponseItem);
+
+/**
+ * @summary Get download or preview URL for a vault document
+ */
+export const GetVaultFileUrlParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetVaultFileUrlResponse = zod.object({
+  url: zod.string(),
+  fileName: zod.string(),
+  mimeType: zod.string(),
+  isLegacy: zod.boolean(),
+});

@@ -1,21 +1,168 @@
-import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, vaultItemsTable, systemConfigsTable } from "@workspace/db";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { eq, desc, and, sql } from "drizzle-orm";
+import multer from "multer";
+import path from "path";
+import { db, vaultItemsTable, systemConfigsTable, usersTable } from "@workspace/db";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
+import {
+  uploadVaultFile,
+  deleteVaultFile,
+  getSignedUrl,
+  formatFileSize,
+  ALLOWED_EXTENSIONS,
+  ALLOWED_MIME_TYPES,
+} from "../lib/vaultStorage";
 
 const router: IRouter = Router();
 
-// 1. Vault Accessibility Settings (Public to read, Admin only to update)
-router.get("/vault/settings", async (_req, res): Promise<void> => {
+// Flag to log generated SQL once for verification
+let hasLoggedVaultListSql = false;
+
+// ============================================================================
+// File Size & Upload Helpers
+// ============================================================================
+
+function sanitizeFileName(rawName: string): string {
+  const base = path.basename(rawName || "document").replace(/[\0\r\n]/g, "").trim();
+  return base || "document";
+}
+
+// Configurable file size ceiling (default 50 MB)
+const DEFAULT_MAX_MB = 50;
+function getMaxVaultFileMb(): number {
+  const envVal = parseInt(process.env.VAULT_MAX_FILE_MB || "", 10);
+  return !isNaN(envVal) && envVal > 0 ? envVal : DEFAULT_MAX_MB;
+}
+
+const vaultMulter = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: getMaxVaultFileMb() * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase().replace(/^\./, "");
+    const mime = (file.mimetype || "").toLowerCase();
+
+    if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+      cb(new Error(`Invalid file extension '.${ext}'. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(", ")}`));
+      return;
+    }
+
+    if (!mime || !ALLOWED_MIME_TYPES.has(mime)) {
+      cb(new Error(`Invalid file MIME type '${mime}'. Allowed: documents and images.`));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
+
+function handleVaultUploadMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!req.is("multipart/form-data")) {
+    next();
+    return;
+  }
+
+  vaultMulter.single("file")(req, res, (err: any) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ error: `File size exceeds the limit of ${getMaxVaultFileMb()} MB.` });
+        return;
+      }
+      res.status(400).json({ error: err.message || "File upload validation failed." });
+      return;
+    }
+    next();
+  });
+}
+
+// ============================================================================
+// Access Rule Helper (Fail Closed)
+// ============================================================================
+
+async function checkVaultAccess(req: Request): Promise<{ allowed: boolean; status?: number; error?: string }> {
   try {
     const [row] = await db
-      .select()
+      .select({ value: systemConfigsTable.value })
+      .from(systemConfigsTable)
+      .where(eq(systemConfigsTable.key, "vault.isPublic"));
+
+    // If setting doesn't exist, default to public; if query fails, catch block fails closed.
+    const isPublic = row ? row.value !== "false" : true;
+    if (isPublic) {
+      return { allowed: true };
+    }
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+      },
+      "Error checking vault.isPublic system config"
+    );
+    // Fail closed if lookup errors
+    return { allowed: false, status: 403, error: "Study vault is currently unavailable." };
+  }
+
+  // When vault is locked (isPublic === false): require authenticated admin
+  if (!req.isAuthenticated()) {
+    return { allowed: false, status: 401, error: "Authentication required." };
+  }
+
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id, role: usersTable.role, email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
+    const isAdmin = user?.role === "admin" || (adminEmail && user?.email?.toLowerCase() === adminEmail);
+
+    if (!isAdmin) {
+      return { allowed: false, status: 403, error: "Study vault access is currently restricted to administrators." };
+    }
+
+    return { allowed: true };
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+      },
+      "Error checking admin permissions for vault access"
+    );
+    return { allowed: false, status: 403, error: "Access verification failed." };
+  }
+}
+
+// ============================================================================
+// Routes
+// ============================================================================
+
+// 1. Vault Accessibility Settings (Public to read, Admin only to update)
+router.get("/vault/settings", async (req, res): Promise<void> => {
+  try {
+    const [row] = await db
+      .select({ value: systemConfigsTable.value })
       .from(systemConfigsTable)
       .where(eq(systemConfigsTable.key, "vault.isPublic"));
     const isPublic = row ? row.value !== "false" : true;
     res.json({ isPublic });
-  } catch {
-    res.json({ isPublic: true });
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+      },
+      "Error fetching vault settings"
+    );
+    res.json({ isPublic: false }); // Fail closed on error
   }
 });
 
@@ -31,79 +178,341 @@ router.post("/vault/settings", adminMiddleware, async (req, res): Promise<void> 
   res.json({ success: true, isPublic: val === "true" });
 });
 
-// 2. Get vault items for a subject or all subjects (public for students when enabled)
+// 2. Get vault items list (Lightweight: NEVER returns fileUrl or storagePath)
 router.get("/vault", async (req, res): Promise<void> => {
-  const subjectId = req.query.subjectId ? parseInt(req.query.subjectId as string) : undefined;
-  const category = req.query.category as string | undefined;
+  try {
+    const access = await checkVaultAccess(req);
+    if (!access.allowed) {
+      res.status(access.status || 403).json({ error: access.error });
+      return;
+    }
 
-  let items = await db.select().from(vaultItemsTable).orderBy(desc(vaultItemsTable.createdAt));
+    const subjectId = req.query.subjectId ? parseInt(req.query.subjectId as string, 10) : undefined;
+    const category = req.query.category as string | undefined;
 
-  if (subjectId && !isNaN(subjectId)) {
-    items = items.filter((i) => i.subjectId === subjectId);
+    // Explicitly select only lightweight columns; compute isLegacy in SQL; NEVER select raw fileUrl or storagePath
+    const query = db
+      .select({
+        id: vaultItemsTable.id,
+        userId: vaultItemsTable.userId,
+        subjectId: vaultItemsTable.subjectId,
+        title: vaultItemsTable.title,
+        category: vaultItemsTable.category,
+        description: vaultItemsTable.description,
+        tags: vaultItemsTable.tags,
+        fileName: vaultItemsTable.fileName,
+        fileSize: vaultItemsTable.fileSize,
+        mimeType: vaultItemsTable.mimeType,
+        createdAt: vaultItemsTable.createdAt,
+        updatedAt: vaultItemsTable.updatedAt,
+        isLegacy: sql<boolean>`coalesce(${vaultItemsTable.fileUrl} LIKE 'data:%', false)`.as("is_legacy"),
+      })
+      .from(vaultItemsTable)
+      .orderBy(desc(vaultItemsTable.createdAt));
+
+    // Log the generated SQL query once to verify file_url is not in the select list as a raw column
+    if (!hasLoggedVaultListSql) {
+      hasLoggedVaultListSql = true;
+      const sqlObj = query.toSQL();
+      req.log?.info?.({ generatedSql: sqlObj.sql }, "Verified GET /vault generated SQL query");
+      console.log("[VAULT_SQL_VERIFY]", sqlObj.sql);
+    }
+
+    const items = await query;
+
+    let filtered = items;
+    if (subjectId && !isNaN(subjectId)) {
+      filtered = filtered.filter((i) => i.subjectId === subjectId);
+    }
+    if (category && category !== "all") {
+      filtered = filtered.filter((i) => i.category === category);
+    }
+
+    // Return lightweight payloads with isLegacy boolean, stripping fileUrl and storagePath
+    res.json(
+      filtered.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        subjectId: item.subjectId,
+        title: item.title,
+        category: item.category,
+        description: item.description,
+        tags: typeof item.tags === "string" ? JSON.parse(item.tags || "[]") : item.tags || [],
+        fileName: item.fileName,
+        fileSize: item.fileSize,
+        mimeType: item.mimeType,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        isLegacy: Boolean(item.isLegacy),
+      }))
+    );
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+        pgDetail: underlying?.detail,
+      },
+      "Error executing GET /vault query"
+    );
+    console.error("[VAULT_LIST_ERROR]", {
+      message: err?.message,
+      causeCode: underlying?.code,
+      causeMessage: underlying?.message,
+    });
+    res.status(500).json({ error: "Failed to load vault items." });
   }
-  if (category && category !== "all") {
-    items = items.filter((i) => i.category === category);
-  }
-
-  res.json(
-    items.map((item) => ({
-      ...item,
-      tags: typeof item.tags === "string" ? JSON.parse(item.tags || "[]") : item.tags,
-      createdAt: item.createdAt.toISOString(),
-      updatedAt: item.updatedAt.toISOString(),
-    }))
-  );
 });
 
-// 3. Upload / Create a new vault item (Admin only!)
-router.post("/vault", adminMiddleware, async (req, res): Promise<void> => {
-  const { subjectId, title, category, description, fileUrl, fileName, fileSize, mimeType, tags } = req.body;
-  const userId = req.user?.id || "admin";
-
-  if (!subjectId || !title || !fileUrl || !fileName) {
-    res.status(400).json({ error: "Missing required fields (subjectId, title, fileUrl, fileName)" });
+// 3. Get single vault item file URL (signed URL for Supabase Storage, inline string for legacy)
+router.get("/vault/:id/file-url", async (req, res): Promise<void> => {
+  const access = await checkVaultAccess(req);
+  if (!access.allowed) {
+    res.status(access.status || 403).json({ error: access.error });
     return;
   }
 
-  const [created] = await db
-    .insert(vaultItemsTable)
-    .values({
-      userId,
-      subjectId: parseInt(String(subjectId)),
-      title: title.trim(),
-      category: category || "pdf",
-      description: description ? description.trim() : null,
-      fileUrl,
-      fileName,
-      fileSize: fileSize || null,
-      mimeType: mimeType || null,
-      tags: JSON.stringify(tags || []),
-    })
-    .returning();
-
-  res.status(201).json({
-    ...created,
-    tags: JSON.parse(created.tags || "[]"),
-    createdAt: created.createdAt.toISOString(),
-    updatedAt: created.updatedAt.toISOString(),
-  });
-});
-
-// 4. Delete a vault item (Admin only!)
-router.delete("/vault/:id", adminMiddleware, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id);
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid item ID" });
     return;
   }
 
-  const [deleted] = await db.delete(vaultItemsTable).where(eq(vaultItemsTable.id, id)).returning();
-  if (!deleted) {
-    res.status(404).json({ error: "Item not found" });
+  try {
+    // Select only columns required for download/view
+    const [item] = await db
+      .select({
+        id: vaultItemsTable.id,
+        fileName: vaultItemsTable.fileName,
+        mimeType: vaultItemsTable.mimeType,
+        storagePath: vaultItemsTable.storagePath,
+        fileUrl: vaultItemsTable.fileUrl,
+      })
+      .from(vaultItemsTable)
+      .where(eq(vaultItemsTable.id, id))
+      .limit(1);
+
+    if (!item) {
+      res.status(404).json({ error: "Vault item not found" });
+      return;
+    }
+
+    // If item has a Supabase Storage path, generate a 1-hour signed URL
+    if (item.storagePath) {
+      try {
+        const signedUrl = await getSignedUrl(item.storagePath, 3600);
+        res.json({
+          url: signedUrl,
+          fileName: item.fileName,
+          mimeType: item.mimeType || "application/octet-stream",
+          isLegacy: false,
+        });
+        return;
+      } catch (err: any) {
+        req.log?.error?.({ err, storagePath: item.storagePath }, "Error generating signed URL");
+        res.status(500).json({ error: "Failed to generate download URL for this file." });
+        return;
+      }
+    }
+
+    // Legacy item with Base64 data: URL
+    if (item.fileUrl) {
+      res.json({
+        url: item.fileUrl,
+        fileName: item.fileName,
+        mimeType: item.mimeType || "application/octet-stream",
+        isLegacy: true,
+      });
+      return;
+    }
+
+    res.status(404).json({ error: "File content not available for this item." });
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+      },
+      "Error retrieving vault file URL"
+    );
+    res.status(500).json({ error: "Failed to retrieve document URL." });
+  }
+});
+
+// 4. Upload / Create a new vault item (Admin only)
+// Supports multipart/form-data (Supabase Storage) and legacy application/json (Base64)
+router.post(
+  "/vault",
+  adminMiddleware,
+  handleVaultUploadMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.user?.id || "admin";
+
+    // A. Multipart / Supabase Storage path
+    if (req.file) {
+      const { subjectId, title, category, description, tags } = req.body;
+
+      if (!subjectId || !title) {
+        res.status(400).json({ error: "Missing required fields (subjectId, title)." });
+        return;
+      }
+
+      let parsedTags: string[] = [];
+      if (tags) {
+        try {
+          parsedTags = typeof tags === "string" ? JSON.parse(tags) : Array.isArray(tags) ? tags : [];
+        } catch {
+          parsedTags = typeof tags === "string" ? [tags] : [];
+        }
+      }
+
+      const originalName = req.file.originalname || "document.pdf";
+      const sanitizedName = sanitizeFileName(originalName);
+      const mimeType = req.file.mimetype || "application/octet-stream";
+      const fileSize = formatFileSize(req.file.size);
+
+      let storagePath: string;
+      try {
+        storagePath = await uploadVaultFile(req.file.buffer, originalName, mimeType);
+      } catch (err: any) {
+        req.log?.error?.({ err }, "Supabase storage upload error");
+        res.status(500).json({ error: err.message || "Failed to store file in vault storage." });
+        return;
+      }
+
+      const [created] = await db
+        .insert(vaultItemsTable)
+        .values({
+          userId,
+          subjectId: parseInt(String(subjectId), 10),
+          title: String(title).trim(),
+          category: category || "pdf",
+          description: description ? String(description).trim() : null,
+          storagePath,
+          fileUrl: null,
+          fileName: sanitizedName,
+          fileSize,
+          mimeType,
+          tags: JSON.stringify(parsedTags),
+        })
+        .returning();
+
+      res.status(201).json({
+        id: created.id,
+        userId: created.userId,
+        subjectId: created.subjectId,
+        title: created.title,
+        category: created.category,
+        description: created.description,
+        tags: parsedTags,
+        fileName: created.fileName,
+        fileSize: created.fileSize,
+        mimeType: created.mimeType,
+        createdAt: created.createdAt.toISOString(),
+        updatedAt: created.updatedAt.toISOString(),
+        isLegacy: false,
+      });
+      return;
+    }
+
+    // B. Legacy JSON / Base64 upload path
+    const { subjectId, title, category, description, fileUrl, fileName, fileSize, mimeType, tags } = req.body;
+
+    if (!subjectId || !title || !fileUrl || !fileName) {
+      res.status(400).json({ error: "Missing required fields (subjectId, title, fileUrl, fileName)" });
+      return;
+    }
+
+    const [created] = await db
+      .insert(vaultItemsTable)
+      .values({
+        userId,
+        subjectId: parseInt(String(subjectId), 10),
+        title: String(title).trim(),
+        category: category || "pdf",
+        description: description ? String(description).trim() : null,
+        fileUrl,
+        storagePath: null,
+        fileName: sanitizeFileName(fileName),
+        fileSize: fileSize || null,
+        mimeType: mimeType || null,
+        tags: JSON.stringify(tags || []),
+      })
+      .returning();
+
+    res.status(201).json({
+      id: created.id,
+      userId: created.userId,
+      subjectId: created.subjectId,
+      title: created.title,
+      category: created.category,
+      description: created.description,
+      tags: typeof created.tags === "string" ? JSON.parse(created.tags || "[]") : created.tags || [],
+      fileName: created.fileName,
+      fileSize: created.fileSize,
+      mimeType: created.mimeType,
+      createdAt: created.createdAt.toISOString(),
+      updatedAt: created.updatedAt.toISOString(),
+      isLegacy: true,
+    });
+  }
+);
+
+// 5. Delete a vault item (Admin only)
+router.delete("/vault/:id", adminMiddleware, async (req: Request, res: Response): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid item ID" });
     return;
   }
 
-  res.json({ success: true, id });
+  try {
+    // Find item selecting only id and storagePath
+    const [item] = await db
+      .select({
+        id: vaultItemsTable.id,
+        storagePath: vaultItemsTable.storagePath,
+      })
+      .from(vaultItemsTable)
+      .where(eq(vaultItemsTable.id, id))
+      .limit(1);
+
+    if (!item) {
+      res.status(404).json({ error: "Item not found" });
+      return;
+    }
+
+    // If storagePath is set, remove from Supabase Storage
+    if (item.storagePath) {
+      try {
+        await deleteVaultFile(item.storagePath);
+      } catch (err: any) {
+        // Storage deletion failure is logged, but does not block deleting the DB row
+        req.log?.error?.({ err, storagePath: item.storagePath }, "Failed to delete storage file from Supabase");
+      }
+    }
+
+    await db.delete(vaultItemsTable).where(eq(vaultItemsTable.id, id));
+
+    res.json({ success: true, id });
+  } catch (err: any) {
+    const underlying = err?.cause || {};
+    req.log?.error?.(
+      {
+        errMessage: err?.message,
+        pgCode: underlying?.code,
+        pgMessage: underlying?.message,
+      },
+      "Error deleting vault item"
+    );
+    res.status(500).json({ error: "Failed to delete vault item." });
+  }
 });
 
 export default router;
