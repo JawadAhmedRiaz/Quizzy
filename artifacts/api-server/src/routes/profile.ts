@@ -16,7 +16,7 @@ router.get("/profile/:userId", async (req, res): Promise<void> => {
 });
 
 router.post("/profile", async (req, res): Promise<void> => {
-  const { userId, displayName, rollNumber, department, section, gender, notificationsEnabled } = req.body;
+  const { userId, displayName, rollNumber, department, section, gender, semester, notificationsEnabled } = req.body;
   if (!userId) { res.status(400).json({ error: "userId required" }); return; }
 
   // Enforce unique display name (case-insensitive) across all profiles
@@ -50,6 +50,7 @@ router.post("/profile", async (req, res): Promise<void> => {
         department: department ?? null,
         section: section ?? null,
         gender: gender ?? null,
+        semester: semester !== undefined && semester !== null ? Number(semester) : 1,
         notificationsEnabled: notificationsEnabled ?? false,
       }).returning();
       res.status(201).json({ ...created, createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() });
@@ -60,6 +61,7 @@ router.post("/profile", async (req, res): Promise<void> => {
       if (department !== undefined) updates.department = department;
       if (section !== undefined) updates.section = section;
       if (gender !== undefined) updates.gender = gender;
+      if (semester !== undefined && semester !== null) updates.semester = Number(semester);
       if (notificationsEnabled !== undefined) updates.notificationsEnabled = notificationsEnabled;
 
       const [updated] = await db.update(profilesTable).set(updates).where(eq(profilesTable.userId, userId)).returning();

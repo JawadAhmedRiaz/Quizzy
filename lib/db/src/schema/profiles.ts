@@ -7,6 +7,7 @@ export const profilesTable = pgTable("profiles", {
   department: text("department"),
   section: text("section"),
   gender: text("gender"),
+  semester: integer("semester").default(1),
   xp: integer("xp").notNull().default(0),
   streakCount: integer("streak_count").notNull().default(0),
   streakLastDate: text("streak_last_date"),

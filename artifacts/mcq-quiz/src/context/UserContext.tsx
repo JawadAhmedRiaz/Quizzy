@@ -10,6 +10,7 @@ export interface UserProfile {
   department: string | null;
   section: string | null;
   gender: string | null;
+  semester?: number | null;
   xp: number;
   streakCount: number;
   streakLastDate: string | null;

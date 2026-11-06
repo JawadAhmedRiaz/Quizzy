@@ -49,7 +49,7 @@ export function ProfilePage() {
   // Semester state
   const [semester, setSemester] = useState<number>(() => {
     const saved = localStorage.getItem("quizzy_student_sem");
-    return saved ? Number(saved) : 4;
+    return saved ? Number(saved) : 1;
   });
 
   // Profile fields state
@@ -82,6 +82,10 @@ export function ProfilePage() {
       setDepartment(profile.department ?? "");
       setSection(profile.section ?? "");
       setGender(profile.gender ?? "");
+      if (profile.semester) {
+        setSemester(profile.semester);
+        localStorage.setItem("quizzy_student_sem", String(profile.semester));
+      }
     }
   }, [profile]);
 
@@ -95,6 +99,7 @@ export function ProfilePage() {
       department: department || null,
       section: section || null,
       gender: gender || null,
+      semester: semester ? Number(semester) : 1,
     } as any);
 
     if (res && !res.ok) {

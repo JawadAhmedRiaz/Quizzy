@@ -51,7 +51,7 @@ export function HomePage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { effectiveUserId, profile, isAdmin } = useUser();
   const settings = useSettings();
-  const [selectedSem, setSelectedSem] = useState<number>(() => {
+  const defaultSem = profile?.semester ?? (() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("quizzy_student_sem");
       if (saved) {
@@ -60,9 +60,20 @@ export function HomePage() {
       }
     }
     return 1;
-  });
+  })();
+  const [selectedSem, setSelectedSem] = useState<number>(defaultSem);
+  const [hasInitializedProfileSem, setHasInitializedProfileSem] = useState(false);
 
-  // Keep in sync with user's selected semester
+  // Sync initial semester from profile when profile loads
+  useEffect(() => {
+    if (profile?.semester && !hasInitializedProfileSem) {
+      setSelectedSem(profile.semester);
+      setSelectedSubject(null);
+      setHasInitializedProfileSem(true);
+    }
+  }, [profile?.semester, hasInitializedProfileSem]);
+
+  // Keep in sync with user's saved profile semester
   useEffect(() => {
     const handleSemUpdate = () => {
       const saved = localStorage.getItem("quizzy_student_sem");
@@ -75,10 +86,8 @@ export function HomePage() {
       }
     };
     window.addEventListener("quizzy_semester_updated", handleSemUpdate);
-    window.addEventListener("storage", handleSemUpdate);
     return () => {
       window.removeEventListener("quizzy_semester_updated", handleSemUpdate);
-      window.removeEventListener("storage", handleSemUpdate);
     };
   }, []);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -179,8 +188,6 @@ export function HomePage() {
   function changeSem(sem: number) {
     setSelectedSem(sem);
     setSelectedSubject(null);
-    localStorage.setItem("quizzy_student_sem", String(sem));
-    window.dispatchEvent(new Event("quizzy_semester_updated"));
   }
 
   function getSubjectBubbleCount(subj: Subject): number {

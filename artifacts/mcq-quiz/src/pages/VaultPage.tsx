@@ -72,7 +72,7 @@ const CATEGORIES = [
 
 export function VaultPage() {
   const [, navigate] = useLocation();
-  const { isAdmin } = useUser();
+  const { isAdmin, profile } = useUser();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [items, setItems] = useState<VaultDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +80,13 @@ export function VaultPage() {
   // Vault Accessibility Status
   const [isVaultPublic, setIsVaultPublic] = useState<boolean | null>(null);
 
-  // Filters (Semester defaults to 1, subject defaults to first subject of semester 1)
-  const [selectedSem, setSelectedSem] = useState<number>(1);
+  // Filters (Semester defaults to user's profile semester or 1)
+  const defaultSem = profile?.semester ?? (() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("quizzy_student_sem") : null;
+    return saved ? Number(saved) : 1;
+  })();
+  const [selectedSem, setSelectedSem] = useState<number>(defaultSem);
+  const [hasInitializedProfileSem, setHasInitializedProfileSem] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | "">("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -272,9 +277,11 @@ export function VaultPage() {
       .then((data: Subject[]) => {
         setSubjects(data);
         if (data.length > 0) {
-          const sem1Subs = data.filter((s) => s.sem === 1);
-          if (sem1Subs.length > 0) {
-            setSelectedSubjectId(sem1Subs[0].id);
+          const targetSem = profile?.semester ?? defaultSem;
+          setSelectedSem(targetSem);
+          const semSubs = data.filter((s) => s.sem === targetSem);
+          if (semSubs.length > 0) {
+            setSelectedSubjectId(semSubs[0].id);
           } else {
             setSelectedSubjectId(data[0].id);
             setSelectedSem(data[0].sem);
@@ -283,6 +290,20 @@ export function VaultPage() {
       })
       .catch(() => setSubjects([]));
   }, []);
+
+  // Sync with profile semester when profile loads
+  useEffect(() => {
+    if (profile?.semester && !hasInitializedProfileSem) {
+      setSelectedSem(profile.semester);
+      setHasInitializedProfileSem(true);
+      if (subjects.length > 0) {
+        const semSubs = subjects.filter((s) => s.sem === profile.semester);
+        if (semSubs.length > 0) {
+          setSelectedSubjectId(semSubs[0].id);
+        }
+      }
+    }
+  }, [profile?.semester, subjects, hasInitializedProfileSem]);
 
   // 3. Fetch all published vault items
   const fetchVaultItems = () => {

@@ -23,7 +23,6 @@ import { useGetUserAnalytics, getGetUserAnalyticsQueryKey } from "@workspace/api
 
 const API = import.meta.env.BASE_URL + "api";
 
-const ALL_SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 function xpLevelInfo(xp: number) {
   if (xp < 201) return { level: "Beginner", emoji: "🌱", next: 201, cur: 0 };
@@ -42,12 +41,18 @@ export function DashboardPage() {
   // Avatar state
   const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
 
-  // Semester state
+  // Semester state (synced with profile)
   const [selectedSemester, setSelectedSemester] = useState<number>(() => {
-    const saved = localStorage.getItem("quizzy_student_sem");
-    return saved ? Number(saved) : 4;
+    const saved = typeof window !== "undefined" ? localStorage.getItem("quizzy_student_sem") : null;
+    return saved ? Number(saved) : 1;
   });
-  const [isEditingSem, setIsEditingSem] = useState(false);
+
+  useEffect(() => {
+    if (profile?.semester) {
+      setSelectedSemester(profile.semester);
+      localStorage.setItem("quizzy_student_sem", String(profile.semester));
+    }
+  }, [profile?.semester]);
 
   useEffect(() => {
     const handleSemUpdate = () => {
@@ -89,12 +94,6 @@ export function DashboardPage() {
       .catch(() => null);
   }, [effectiveUserId]);
 
-  function handleSemesterChange(sem: number) {
-    setSelectedSemester(sem);
-    localStorage.setItem("quizzy_student_sem", String(sem));
-    window.dispatchEvent(new Event("quizzy_semester_updated"));
-    setIsEditingSem(false);
-  }
 
   function handleAvatarChange(newId: string) {
     setAvatarId(newId);
@@ -215,51 +214,19 @@ export function DashboardPage() {
                   )}
                 </div>
 
-                {/* Semester Badge + Selector */}
+                {/* Semester Badge (read-only, configured in profile) */}
                 <div className="flex items-center gap-2 mt-3">
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingSem(!isEditingSem)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
-                      style={{
-                        background: "rgba(0, 122, 255, 0.12)",
-                        border: "1px solid rgba(0, 122, 255, 0.3)",
-                        color: "#007AFF",
-                      }}
-                      title="Click to switch your current semester"
-                    >
-                      <span>🎓</span>
-                      <span>Semester {selectedSemester}</span>
-                      <span className="text-[10px] opacity-70">▼</span>
-                    </button>
-
-                    {/* Semester Dropdown */}
-                    <AnimatePresence>
-                      {isEditingSem && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                          className="absolute left-0 top-full mt-1.5 z-40 bg-card rounded-2xl p-2 shadow-2xl border border-border grid grid-cols-4 gap-1.5 min-w-[200px]"
-                        >
-                          {ALL_SEMESTERS.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => handleSemesterChange(s)}
-                              className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
-                                s === selectedSemester
-                                  ? "bg-blue-600 text-white shadow-md"
-                                  : "bg-muted/50 hover:bg-muted text-foreground"
-                              }`}
-                            >
-                              Sem {s}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                  <div
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm select-none"
+                    style={{
+                      background: "rgba(0, 122, 255, 0.12)",
+                      border: "1px solid rgba(0, 122, 255, 0.3)",
+                      color: "#007AFF",
+                    }}
+                    title="Configured in your Profile"
+                  >
+                    <span>🎓</span>
+                    <span>Semester {profile?.semester ?? selectedSemester ?? 1}</span>
                   </div>
 
                   {/* Daily Streak */}
