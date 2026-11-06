@@ -393,40 +393,28 @@ router.get("/quiz-reports/study-time", async (req, res): Promise<void> => {
 });
 
 router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
-  const userName = req.query.userName as string;
-  if (!userName || !userName.trim() || userName.trim().toLowerCase() === "guest" || userName.trim().toLowerCase() === "guest scholar") {
-    res.json([]);
+  if (!req.isAuthenticated() || !req.user?.id) {
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
+
+  const userId = req.user.id;
   const { matchesUser } = await getUserIdentities();
   const allReports = await db.select().from(quizReportsTable).orderBy(desc(quizReportsTable.id));
 
-  const userReports = allReports.filter((r) => matchesUser(r.userName, userName));
+  const userReports = allReports.filter((r) => matchesUser(r.userName, userId));
 
   // Load server-side dismissed mistake keys for this user
   let dismissedKeys = new Set<string>();
   try {
-    const users = await db.select().from(usersTable);
-    const matchedUser = users.find((u) =>
-      matchesUser(u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : "", userName) ||
-      matchesUser(u.email || "", userName)
-    );
-    if (matchedUser) {
-      const [dismissed] = await db
-        .select()
-        .from(attemptedQuestionsTable)
-        .where(eq(attemptedQuestionsTable.userId, matchedUser.id))
-        .limit(1);
-      // We store dismissed keys in a special row with quizId = "revision_dismissed"
-      const dismissedRow = await db
-        .select()
-        .from(attemptedQuestionsTable)
-        .where(eq(attemptedQuestionsTable.quizId, `revision_dismissed_${matchedUser.id}`))
-        .limit(1);
-      if (dismissedRow[0]?.questionHashes) {
-        const keys: string[] = JSON.parse(dismissedRow[0].questionHashes);
-        dismissedKeys = new Set(keys.map((k) => k.trim().toLowerCase()));
-      }
+    const dismissedRow = await db
+      .select()
+      .from(attemptedQuestionsTable)
+      .where(eq(attemptedQuestionsTable.quizId, `revision_dismissed_${userId}`))
+      .limit(1);
+    if (dismissedRow[0]?.questionHashes) {
+      const keys: string[] = JSON.parse(dismissedRow[0].questionHashes);
+      dismissedKeys = new Set(keys.map((k) => k.trim().toLowerCase()));
     }
   } catch {}
 
@@ -506,7 +494,7 @@ router.get("/quiz-reports/mistakes", async (req, res): Promise<void> => {
 
 // Persist dismissed mistake keys server-side so deletions survive across devices/incognito
 router.delete("/quiz-reports/mistakes", async (req, res): Promise<void> => {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated() || !req.user?.id) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
