@@ -515,10 +515,11 @@ export function HomePage() {
                   onChange={e => setFeedbackMsg(e.target.value)}
                   placeholder="e.g. Question #42 in English Midterm has a wrong answer…"
                   rows={4}
+                  className="text-base md:text-sm"
                   style={{
                     width: "100%", background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))",
                     borderRadius: 10, color: "hsl(var(--foreground))", padding: "10px 12px",
-                    fontSize: 13, outline: "none", resize: "none", fontFamily: "inherit",
+                    outline: "none", resize: "none", fontFamily: "inherit",
                   }}
                 />
                 <div className="flex gap-3 mt-3">

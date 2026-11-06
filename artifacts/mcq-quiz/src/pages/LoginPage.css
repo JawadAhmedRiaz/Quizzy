@@ -2,14 +2,18 @@
 
 .login-stage {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at 50% 45%, #faf7f0 0%, #f3efe6 50%, #eae4d6 100%);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   user-select: none;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) 1rem max(1.25rem, env(safe-area-inset-bottom, 0px)) 1rem;
 }
 
 /* 30% Blue: Ambient luminous glow behind the glass */
@@ -271,4 +275,64 @@
 @keyframes cyber-rightArrow {
   from { transform: translateY(-50%) translate(0px); }
   to { transform: translateY(-50%) translateX(-10px); }
+}
+
+@media (max-width: 640px) {
+  .login-ambient-glow {
+    width: 320px;
+    height: 320px;
+  }
+
+  .login-ambient-glow-secondary {
+    width: 250px;
+    height: 250px;
+  }
+
+  .login-quizzy-text {
+    font-size: clamp(4.5rem, 18vw, 7.5rem);
+  }
+
+  .login-glass-square {
+    width: 100%;
+    max-width: 380px;
+    height: auto;
+    aspect-ratio: auto;
+    padding: 1.75rem 1.25rem;
+    border-radius: 24px;
+    justify-content: flex-start;
+    gap: 1.5rem;
+  }
+
+  .login-card-desc {
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  .login-card-actions {
+    margin-top: 0;
+    transform: none;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .cyber-btn-wrapper button {
+    height: 52px !important;
+    min-height: 52px !important;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+  }
+
+  .cyber-btn-arrow {
+    display: none;
+  }
+
+  .cyber-btn-corner {
+    width: 2.5em;
+    height: 2.5em;
+  }
+
+  .cyber-btn-corner-rt { top: -1.25em; left: 91%; }
+  .cyber-btn-corner-lt { top: -1.25em; left: -1.8em; }
+  .cyber-btn-corner-lb { bottom: -1.25em; left: -1.8em; }
+  .cyber-btn-corner-rb { bottom: -1.25em; left: 91%; }
 }

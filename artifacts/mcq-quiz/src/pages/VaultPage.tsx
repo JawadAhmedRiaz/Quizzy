@@ -534,7 +534,7 @@ export function VaultPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={`Search in ${activeSubject?.name || "current subject"}...`}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs sm:text-sm outline-none bg-muted/60 border border-border/80 text-foreground transition-all focus:border-blue-500 focus:bg-background"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-base sm:text-sm outline-none bg-muted/60 border border-border/80 text-foreground transition-all focus:border-blue-500 focus:bg-background"
               />
               {searchQuery && (
                 <button
@@ -879,7 +879,7 @@ export function VaultPage() {
                 {/* Preview Viewport */}
                 <div
                   className={`flex-1 my-3 overflow-hidden rounded-2xl bg-muted/40 border border-border/60 flex flex-col items-center justify-center ${
-                    isFullscreen ? "h-[calc(100vh-140px)] max-h-none p-2" : "max-h-[60vh] p-4 overflow-y-auto"
+                    isFullscreen ? "h-[calc(100vh-140px)] h-[calc(100dvh-140px)] max-h-none p-2" : "max-h-[60vh] max-h-[60dvh] p-4 overflow-y-auto"
                   }`}
                 >
                   {previewLoading ? (
@@ -961,7 +961,7 @@ export function VaultPage() {
                             <iframe
                               src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
                               title={previewDoc.title}
-                              className={`w-full rounded-xl border border-border ${isFullscreen ? "h-[calc(100vh-210px)]" : "h-[50vh]"}`}
+                              className={`w-full rounded-xl border border-border ${isFullscreen ? "h-[calc(100vh-210px)] h-[calc(100dvh-210px)]" : "h-[50vh] h-[50dvh]"}`}
                             />
                           </div>
                         );
@@ -1001,7 +1001,10 @@ export function VaultPage() {
 
         {/* Fallback open link for mobile users when popup was blocked */}
         {fallbackOpen && (
-          <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 p-4 rounded-2xl bg-card border border-border shadow-2xl flex items-center justify-between gap-3">
+          <div
+            className="fixed right-4 left-4 sm:left-auto z-50 p-4 rounded-2xl bg-card border border-border shadow-2xl flex items-center justify-between gap-3"
+            style={{ bottom: "max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))" }}
+          >
             <div className="text-xs min-w-0">
               <p className="font-bold text-foreground">Document Ready</p>
               <p className="text-muted-foreground truncate max-w-[200px]">{fallbackOpen.title}</p>

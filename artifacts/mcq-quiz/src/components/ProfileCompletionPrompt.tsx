@@ -28,7 +28,8 @@ export function ProfileCompletionPrompt() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 80 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4"
+          className="fixed left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4"
+          style={{ bottom: "max(1.25rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)))" }}
         >
           <div className="rounded-2xl p-4 flex items-center gap-3 shadow-xl glow-card"
             style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>

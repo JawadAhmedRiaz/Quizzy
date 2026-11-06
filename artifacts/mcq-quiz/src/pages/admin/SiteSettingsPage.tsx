@@ -60,7 +60,6 @@ export function SiteSettingsPage() {
     borderRadius: 8,
     color: "#e2e8f0",
     padding: "8px 12px",
-    fontSize: 13,
     outline: "none",
   };
 
@@ -111,10 +110,10 @@ export function SiteSettingsPage() {
             { key: "brand.slogan", label: "Slogan / Tagline", placeholder: "e.g. Ace your exams with confidence" },
             { key: "brand.footerLink", label: "Footer Link URL", placeholder: "https://..." },
           ].map(({ key, label, placeholder }) => (
-            <div key={key} className="flex items-center justify-between py-3" style={{ borderBottom: "1px solid #0f172a" }}>
-              <p className="text-sm font-semibold text-white mr-4">{label}</p>
+            <div key={key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-2" style={{ borderBottom: "1px solid #0f172a" }}>
+              <p className="text-sm font-semibold text-white sm:mr-4">{label}</p>
               <input value={config[key] ?? ""} onChange={e => set(key, e.target.value)}
-                placeholder={placeholder} style={{ ...inputStyle, width: 260 }} />
+                placeholder={placeholder} style={inputStyle} className="w-full sm:w-64 text-base md:text-[13px]" />
             </div>
           ))}
         </section>

@@ -298,7 +298,7 @@ export function ProfilePage() {
                 if (profileError) setProfileError("");
               }}
               placeholder="e.g., Hamid Mukhtar"
-              className={`w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border text-foreground transition-colors ${
+              className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border text-foreground transition-colors ${
                 profileError ? "border-red-500 focus:border-red-500" : "border-border focus:border-blue-500"
               }`}
             />
@@ -349,7 +349,7 @@ export function ProfilePage() {
               value={rollNumber}
               onChange={(e) => setRollNumber(e.target.value)}
               placeholder="e.g., S26-0001"
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
             />
           </div>
 
@@ -358,7 +358,7 @@ export function ProfilePage() {
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
             >
               <option value="">Select department…</option>
               {DEPARTMENTS.map((d) => (
@@ -375,7 +375,7 @@ export function ProfilePage() {
               value={section}
               onChange={(e) => setSection(e.target.value)}
               placeholder="e.g., BCS-2A"
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
             />
           </div>
 
@@ -384,7 +384,7 @@ export function ProfilePage() {
             <select
               value={semester}
               onChange={(e) => setSemester(Number(e.target.value))}
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                 <option key={s} value={s}>
@@ -435,7 +435,7 @@ export function ProfilePage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
                 />
                 <button
                   type="button"
@@ -455,7 +455,7 @@ export function ProfilePage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
                 />
                 <button
                   type="button"
@@ -474,7 +474,7 @@ export function ProfilePage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter new password"
-                className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                className="w-full px-3.5 py-2.5 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
               />
             </div>
 

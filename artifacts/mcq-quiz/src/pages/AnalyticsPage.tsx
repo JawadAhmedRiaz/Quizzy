@@ -301,7 +301,7 @@ export function AnalyticsPage() {
                   <div>
                     <p className="text-xs font-semibold mb-1.5" style={{ color: "#6366f1" }}>Student 1</p>
                     <select value={compare1} onChange={(e) => setCompare1(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg text-sm font-medium outline-none"
+                      className="w-full px-3 py-2.5 rounded-lg text-base md:text-sm font-medium outline-none"
                       style={{ background: "hsl(var(--muted))", border: "1px solid #6366f1", color: "hsl(var(--foreground))" }}>
                       <option value="">— Select —</option>
                       {users?.map((u) => <option key={u.userName} value={u.userName}>{u.userName}</option>)}
@@ -310,7 +310,7 @@ export function AnalyticsPage() {
                   <div>
                     <p className="text-xs font-semibold mb-1.5" style={{ color: "#f59e0b" }}>Student 2</p>
                     <select value={compare2} onChange={(e) => setCompare2(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg text-sm font-medium outline-none"
+                      className="w-full px-3 py-2.5 rounded-lg text-base md:text-sm font-medium outline-none"
                       style={{ background: "hsl(var(--muted))", border: "1px solid #f59e0b", color: "hsl(var(--foreground))" }}>
                       <option value="">— Select —</option>
                       {users?.filter((u) => u.userName !== compare1).map((u) => <option key={u.userName} value={u.userName}>{u.userName}</option>)}

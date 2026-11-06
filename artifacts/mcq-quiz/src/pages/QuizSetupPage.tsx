@@ -227,7 +227,7 @@ export function QuizSetupPage() {
               onFocus={() => setUseCustom(true)}
               onChange={(e) => { setCustomCount(e.target.value); setUseCustom(true); }}
               placeholder={`Custom (1–${questions.length})`}
-              className="flex-1 px-3 py-2.5 rounded-lg text-sm outline-none"
+              className="flex-1 px-3 py-2.5 rounded-lg text-base md:text-sm outline-none"
               style={{
                 background: "hsl(var(--muted))",
                 border: `1px solid ${useCustom ? "#6366f1" : "hsl(var(--border))"}`,

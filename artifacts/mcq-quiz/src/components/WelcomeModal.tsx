@@ -35,7 +35,7 @@ export function WelcomeModal({ show, onDismiss }: Props) {
             initial={{ scale: 0.95, y: 16 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 16 }}
-            className="w-full max-w-sm rounded-3xl p-6 relative flex flex-col gap-4 border"
+            className="w-full max-w-sm max-h-[90dvh] overflow-y-auto rounded-3xl p-6 relative flex flex-col gap-4 border"
             style={{
               background: "hsl(var(--card))",
               borderColor: "hsl(var(--border))",

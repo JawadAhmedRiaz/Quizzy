@@ -133,7 +133,7 @@ export function ComparisonPage() {
                 value={compare1}
                 onChange={(e) => handleSelectStudent1(e.target.value)}
                 disabled={usersLoading}
-                className="w-full px-4 py-3 rounded-2xl text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                className="w-full px-4 py-3 rounded-2xl text-base md:text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-blue-500 transition-all cursor-pointer shadow-xs"
               >
                 <option value="">— Select student —</option>
                 {users.map((u) => (
@@ -154,7 +154,7 @@ export function ComparisonPage() {
                 value={compare2}
                 onChange={(e) => handleSelectStudent2(e.target.value)}
                 disabled={usersLoading}
-                className="w-full px-4 py-3 rounded-2xl text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-amber-500 transition-all cursor-pointer shadow-xs"
+                className="w-full px-4 py-3 rounded-2xl text-base md:text-sm font-semibold outline-none bg-muted/60 border border-border text-foreground focus:border-amber-500 transition-all cursor-pointer shadow-xs"
               >
                 <option value="">— Select student —</option>
                 {users
