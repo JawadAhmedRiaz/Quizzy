@@ -191,7 +191,7 @@ export function ProfilePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/dashboard")}
-              className="p-2 rounded-xl transition-all hover:scale-[1.02] flex items-center gap-1.5 text-xs font-bold"
+              className="px-3 py-2 min-h-[44px] rounded-xl transition-all hover:scale-[1.02] flex items-center gap-1.5 text-xs font-bold cursor-pointer"
               style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}
             >
               <span>←</span>
@@ -322,7 +322,7 @@ export function ProfilePage() {
                   key={v}
                   type="button"
                   onClick={() => setGender(v)}
-                  className="py-2 rounded-xl text-sm font-semibold transition-all"
+                  className="py-2.5 min-h-[44px] rounded-xl text-sm font-semibold transition-all flex items-center justify-center cursor-pointer"
                   style={{
                     background:
                       gender === v
@@ -398,7 +398,7 @@ export function ProfilePage() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow-md mt-1"
+            className="w-full py-3 min-h-[44px] rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow-md mt-1 flex items-center justify-center cursor-pointer"
             style={{
               background: saved ? "rgba(16,185,129,0.2)" : "linear-gradient(135deg, #007aff, #2563eb)",
               color: saved ? "#34d399" : "#fff",
@@ -435,12 +435,12 @@ export function ProfilePage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 pr-12 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPass(!showCurrentPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                  className="absolute right-0 top-0 bottom-0 px-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   {showCurrentPass ? "🙈" : "👁️"}
                 </button>
@@ -455,12 +455,12 @@ export function ProfilePage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 pr-12 rounded-xl text-base md:text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                  className="absolute right-0 top-0 bottom-0 px-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   {showNewPass ? "🙈" : "👁️"}
                 </button>
@@ -481,7 +481,7 @@ export function ProfilePage() {
             <button
               type="submit"
               disabled={passwordSaving}
-              className="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 mt-1"
+              className="w-full py-3 min-h-[44px] rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 mt-1 flex items-center justify-center cursor-pointer"
             >
               {passwordSaving ? "Updating Password…" : "Update Password"}
             </button>
@@ -503,7 +503,7 @@ export function ProfilePage() {
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all hover:scale-105 active:scale-95"
+            className="w-full sm:w-auto px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer"
           >
             {loggingOut ? "Signing out…" : "🚪 Log Out"}
           </button>

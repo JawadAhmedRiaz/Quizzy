@@ -306,7 +306,7 @@ export function RevisionPage() {
 
         {/* ─── SUBJECT PILLS FILTER ─── */}
         {subjects.length > 1 && (
-          <div className="w-full flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none">
+          <div className="w-full flex items-center gap-2 overflow-x-auto py-1 pb-3 mb-6 scrollbar-none touch-pan-x">
             {subjects.map((subj) => {
               const isSelected = selectedSubject === subj;
               const count =
@@ -322,7 +322,7 @@ export function RevisionPage() {
                 <button
                   key={subj}
                   onClick={() => setSelectedSubject(subj)}
-                  className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     isSelected
                       ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 shadow-xs"
                       : "bg-muted/40 text-muted-foreground hover:bg-muted/80 border border-transparent"
@@ -401,7 +401,7 @@ export function RevisionPage() {
 
             {/* 3D Flip Flashcard */}
             <div
-              className="w-full max-w-2xl h-[420px] sm:h-[380px] perspective-[1000px] cursor-pointer relative"
+              className="w-full max-w-2xl h-[min(420px,60dvh)] sm:h-[420px] perspective-[1000px] cursor-pointer relative"
               onClick={() => setIsFlipped(!isFlipped)}
             >
               <motion.div
@@ -412,7 +412,7 @@ export function RevisionPage() {
               >
                 {/* ── CARD FRONT (Question & What You Chose) ── */}
                 <div
-                  className="absolute inset-0 rounded-3xl p-6 sm:p-8 bg-card border border-border/80 shadow-lg flex flex-col justify-between backface-hidden overflow-y-auto"
+                  className="absolute inset-0 rounded-3xl p-4 sm:p-6 md:p-8 bg-card border border-border/80 shadow-lg flex flex-col justify-between backface-hidden overflow-y-auto"
                   style={{
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
@@ -470,7 +470,7 @@ export function RevisionPage() {
 
                 {/* ── CARD BACK (Correct Answer & Explanation) ── */}
                 <div
-                  className="absolute inset-0 rounded-3xl p-6 sm:p-8 bg-card border border-emerald-500/40 shadow-xl flex flex-col justify-between backface-hidden overflow-y-auto"
+                  className="absolute inset-0 rounded-3xl p-4 sm:p-6 md:p-8 bg-card border border-emerald-500/40 shadow-xl flex flex-col justify-between backface-hidden overflow-y-auto"
                   style={{
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
@@ -488,7 +488,7 @@ export function RevisionPage() {
 
                       <button
                         onClick={() => setIsFlipped(false)}
-                        className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1 cursor-pointer"
+                        className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1 cursor-pointer p-1"
                       >
                         <RotateCcw className="w-3 h-3" />
                         <span>Flip Back</span>
@@ -527,13 +527,13 @@ export function RevisionPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleNext}
-                        className="px-4 py-2 rounded-xl text-xs font-bold border border-border bg-muted/40 hover:bg-muted text-foreground transition-all cursor-pointer"
+                        className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold border border-border bg-muted/40 hover:bg-muted text-foreground transition-all cursor-pointer flex items-center justify-center"
                       >
                         Keep Reviewing
                       </button>
                       <button
                         onClick={() => handleDeleteMistake(currentCard.id)}
-                        className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 border border-border/60 transition-all cursor-pointer"
+                        className="p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 border border-border/60 transition-all cursor-pointer flex items-center justify-center"
                         title="Remove from Revision Deck"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -542,7 +542,7 @@ export function RevisionPage() {
 
                     <button
                       onClick={() => handleToggleMastered(currentCard.id, currentCard.mastered)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold text-white transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-extrabold text-white transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
                       style={{
                         background: currentCard.mastered
                           ? "linear-gradient(135deg, #64748b, #475569)"
@@ -561,7 +561,7 @@ export function RevisionPage() {
             <div className="flex items-center gap-4 mt-6">
               <button
                 onClick={handlePrev}
-                className="p-3 rounded-2xl border border-border bg-card hover:bg-muted text-foreground transition-transform active:scale-95 shadow-xs cursor-pointer"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl border border-border bg-card hover:bg-muted text-foreground transition-transform active:scale-95 shadow-xs cursor-pointer"
                 title="Previous Card (Left Arrow)"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -578,7 +578,7 @@ export function RevisionPage() {
 
               <button
                 onClick={handleNext}
-                className="p-3 rounded-2xl border border-border bg-card hover:bg-muted text-foreground transition-transform active:scale-95 shadow-xs cursor-pointer"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl border border-border bg-card hover:bg-muted text-foreground transition-transform active:scale-95 shadow-xs cursor-pointer"
                 title="Next Card (Right Arrow)"
               >
                 <ArrowRight className="w-5 h-5" />
@@ -653,7 +653,7 @@ export function RevisionPage() {
                 <div className="flex sm:flex-col items-center gap-2 shrink-0 self-end sm:self-center">
                   <button
                     onClick={() => handleToggleMastered(record.id, record.mastered)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                       record.mastered
                         ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                         : "bg-muted hover:bg-muted/80 text-foreground border border-border"
@@ -664,10 +664,10 @@ export function RevisionPage() {
 
                   <button
                     onClick={() => handleDeleteMistake(record.id)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                    className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Remove from Revision"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

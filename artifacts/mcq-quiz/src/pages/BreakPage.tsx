@@ -142,7 +142,7 @@ export function BreakPage() {
               <button
                 type="button"
                 onClick={() => setIsPacmanOpen(!isPacmanOpen)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
                   isPacmanOpen
                     ? "border border-border bg-background hover:bg-muted text-muted-foreground"
                     : "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md shadow-amber-500/20 hover:brightness-110 active:scale-95"
@@ -162,6 +162,11 @@ export function BreakPage() {
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden bg-[#090d16] flex flex-col items-center justify-center p-3 sm:p-5"
                 >
+                  {/* Phone recommendation notice */}
+                  <div className="flex md:hidden items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-500 font-medium mb-3 max-w-[620px] w-full text-center justify-center">
+                    <span>📱 Best played on a larger screen or desktop with physical arrow keys</span>
+                  </div>
+
                   <iframe
                     src="/games/pacman/index.html"
                     title="Google PAC-MAN Arcade"
@@ -170,9 +175,9 @@ export function BreakPage() {
                     style={{ background: "#090d16", overflow: "hidden" }}
                     loading="lazy"
                   />
-                  <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-amber-400" />
-                    <span>Click inside game or tap <strong>INSERT COIN</strong> to start. Use Arrow keys to navigate!</span>
+                  <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5 text-center flex-wrap justify-center">
+                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>Click or tap <strong>INSERT COIN</strong> to start. Use the touch D-pad or keyboard arrow keys to navigate!</span>
                   </div>
                 </motion.div>
               )}
@@ -184,17 +189,42 @@ export function BreakPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-6">
           {/* Card 1: 5-Minute Breather Timer */}
           <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden">
-            <div className="w-full flex items-center justify-between mb-4">
+            <div className="w-full flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Quick Breather Timer
               </span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20">
-                5 Min Break
+                {Math.round(breakTimerSeconds / 60)} Min Break
               </span>
             </div>
 
-            <div className="my-4">
-              <div className="text-5xl font-black tracking-tight font-mono text-foreground mb-2">
+            {/* Duration Presets */}
+            <div className="flex items-center gap-2 mb-3">
+              {[
+                { label: "1 min", secs: 60 },
+                { label: "3 min", secs: 180 },
+                { label: "5 min", secs: 300 },
+              ].map((preset) => (
+                <button
+                  key={preset.secs}
+                  type="button"
+                  onClick={() => {
+                    setBreakTimerSeconds(preset.secs);
+                    setIsTimerRunning(false);
+                  }}
+                  className={`px-3 py-2 min-h-[44px] min-w-[58px] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                    breakTimerSeconds === preset.secs
+                      ? "bg-amber-500 text-slate-950 shadow-xs"
+                      : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="my-2">
+              <div className="text-5xl font-black tracking-tight font-mono text-foreground mb-1">
                 {formatTime(breakTimerSeconds)}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -202,11 +232,11 @@ export function BreakPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full justify-center">
+            <div className="flex items-center gap-3 w-full justify-center mt-2">
               <button
                 type="button"
                 onClick={() => setIsTimerRunning(!isTimerRunning)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-transform active:scale-95 cursor-pointer text-white"
+                className="flex items-center gap-2 px-6 py-2.5 min-h-[44px] rounded-xl text-sm font-bold shadow-sm transition-transform active:scale-95 cursor-pointer text-white"
                 style={{
                   background: isTimerRunning
                     ? "linear-gradient(135deg, #ef4444, #dc2626)"
@@ -230,7 +260,7 @@ export function BreakPage() {
                   setIsTimerRunning(false);
                   setBreakTimerSeconds(300);
                 }}
-                className="p-2.5 rounded-xl border border-border bg-muted/50 hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-border bg-muted/50 hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
                 title="Reset timer"
               >
                 <RotateCcw className="w-4 h-4" />

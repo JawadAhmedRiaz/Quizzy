@@ -215,7 +215,7 @@ export function ComparisonPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                       <div className="p-3 rounded-2xl bg-muted/50 border border-border/60">
                         <span className="text-[11px] font-bold text-muted-foreground block">Quizzes Taken</span>
                         <span className="text-lg font-black text-foreground">{d.totalAttempts}</span>

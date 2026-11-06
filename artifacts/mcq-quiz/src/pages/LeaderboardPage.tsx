@@ -110,7 +110,7 @@ export function LeaderboardPage() {
             {meta && <p className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>Sem {meta.sem} · {meta.subjectName} · {meta.examLabel}</p>}
           </div>
           <button onClick={() => navigate("/")}
-            className="px-4 py-2 rounded-lg text-xs font-semibold hover:scale-[1.02] transition-all"
+            className="px-4 py-2 min-h-[40px] rounded-lg text-xs font-semibold hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center"
             style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
             ← Home
           </button>
@@ -123,7 +123,7 @@ export function LeaderboardPage() {
             { id: "xp", label: "⚡ XP Board" },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id as any)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+              className="flex-1 py-2.5 min-h-[44px] rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center justify-center"
               style={{
                 background: tab === t.id ? "linear-gradient(135deg,#3b82f6,#6366f1)" : "hsl(var(--muted))",
                 color: tab === t.id ? "#fff" : "hsl(var(--muted-foreground))",
@@ -205,7 +205,7 @@ export function LeaderboardPage() {
                   const name = resolveDisplayName(e.userName);
                   return (
                     <motion.div key={e.userName} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4) }}
-                      className="flex items-center gap-3 py-3 cursor-pointer rounded-2xl px-3 transition-all"
+                      className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 py-3 cursor-pointer rounded-2xl px-3 transition-all"
                       style={{
                         background: me ? "linear-gradient(90deg, rgba(59,130,246,0.18) 0%, rgba(99,102,241,0.12) 100%)" : "transparent",
                         border: me ? "2px solid #3b82f6" : "1px solid transparent",
@@ -213,16 +213,20 @@ export function LeaderboardPage() {
                         marginBottom: "4px",
                       }}
                       onClick={() => setSelectedUser({ ...e, isMe: me, resolvedName: name })}>
-                      <span className="text-lg w-8 text-center flex-shrink-0 font-black" style={{ color: i < 3 ? rankColors[i] : undefined }}>
-                        {i < 3 ? medals[i] : `#${i + 1}`}
-                      </span>
-                      <span className="flex-1 text-sm font-bold flex items-center gap-2 min-w-0">
-                        <span className={`truncate ${me ? "text-blue-500 dark:text-blue-400 font-black" : ""}`} style={{ maxWidth: "140px" }}>{name}</span>
-                        {me && <span className="text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 text-white tracking-wider" style={{ background: "linear-gradient(135deg, #007aff, #2563eb)" }}>YOU</span>}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa" }}>{e.bestPct}%</span>
-                      <span className="text-sm font-black flex-shrink-0" style={{ color: i < 3 ? rankColors[i] : "#60a5fa" }}>{e.bestScore}</span>
-                      <span className="text-xs flex-shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{e.correct}/{e.total}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-lg w-7 text-center shrink-0 font-black" style={{ color: i < 3 ? rankColors[i] : undefined }}>
+                          {i < 3 ? medals[i] : `#${i + 1}`}
+                        </span>
+                        <span className="text-sm font-bold flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`truncate ${me ? "text-blue-500 dark:text-blue-400 font-black" : ""}`}>{name}</span>
+                          {me && <span className="text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 text-white tracking-wider" style={{ background: "linear-gradient(135deg, #007aff, #2563eb)" }}>YOU</span>}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5 pl-9 sm:pl-0 shrink-0">
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa" }}>{e.bestPct}%</span>
+                        <span className="text-sm font-black" style={{ color: i < 3 ? rankColors[i] : "#60a5fa" }}>{e.bestScore} pts</span>
+                        <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{e.correct}/{e.total}</span>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -260,22 +264,26 @@ export function LeaderboardPage() {
                   const name = e.displayName || (me ? myDisplayName : e.userId.slice(0, 16));
                   return (
                     <motion.div key={e.userId} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4) }}
-                      className="flex items-center gap-3 py-3 rounded-2xl px-3 transition-all"
+                      className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 py-3 rounded-2xl px-3 transition-all cursor-pointer"
                       style={{
                         background: me ? "linear-gradient(90deg, rgba(245,158,11,0.18) 0%, rgba(217,119,6,0.12) 100%)" : "transparent",
                         border: me ? "2px solid #f59e0b" : "1px solid transparent",
                         boxShadow: me ? "0 0 14px rgba(245,158,11,0.2)" : "none",
                         marginBottom: "4px",
                       }}>
-                      <span className="text-lg w-8 text-center flex-shrink-0 font-black" style={{ color: i < 3 ? rankColors[i] : undefined }}>
-                        {i < 3 ? medals[i] : `#${i + 1}`}
-                      </span>
-                      <span className="flex-1 text-sm font-bold flex items-center gap-2 min-w-0">
-                        <span className={`truncate ${me ? "text-amber-500 font-black" : ""}`}>{name}</span>
-                        {me && <span className="text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 text-slate-900 tracking-wider" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>YOU</span>}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-bold" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>{e.level}</span>
-                      <span className="text-sm font-black flex-shrink-0" style={{ color: i < 3 ? rankColors[i] : "#fbbf24" }}>{e.xp.toLocaleString()} XP</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-lg w-7 text-center shrink-0 font-black" style={{ color: i < 3 ? rankColors[i] : undefined }}>
+                          {i < 3 ? medals[i] : `#${i + 1}`}
+                        </span>
+                        <span className="text-sm font-bold flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`truncate ${me ? "text-amber-500 font-black" : ""}`}>{name}</span>
+                          {me && <span className="text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 text-slate-900 tracking-wider" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>YOU</span>}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5 pl-9 sm:pl-0 shrink-0">
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>{e.level}</span>
+                        <span className="text-sm font-black" style={{ color: i < 3 ? rankColors[i] : "#fbbf24" }}>{e.xp.toLocaleString()} XP</span>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -288,22 +296,22 @@ export function LeaderboardPage() {
         <AnimatePresence>
           {selectedUser && (
             <motion.div key="user-modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
               onClick={() => setSelectedUser(null)}>
               <motion.div initial={{ scale: 0.92, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4 shadow-xl"
+                className="w-full max-w-sm max-h-[85dvh] overflow-y-auto rounded-3xl p-5 sm:p-6 flex flex-col gap-4 shadow-xl"
                 style={{
                   background: "hsl(var(--card))",
                   border: `1px solid ${selectedUser.isMe ? "rgba(245,158,11,0.5)" : "hsl(var(--border))"}`,
                 }}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <p className="font-black text-base">{selectedUser.resolvedName ?? selectedUser.userName}</p>
+                    <p className="font-black text-base truncate">{selectedUser.resolvedName ?? selectedUser.userName}</p>
                     {selectedUser.isMe && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>👤 You</span>}
                   </div>
-                  <button onClick={() => setSelectedUser(null)} style={{ color: "hsl(var(--muted-foreground))" }}>✕</button>
+                  <button onClick={() => setSelectedUser(null)} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-muted cursor-pointer" style={{ color: "hsl(var(--muted-foreground))" }}>✕</button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -327,7 +335,7 @@ export function LeaderboardPage() {
                   </div>
                 )}
                 <button onClick={() => setSelectedUser(null)}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                  className="w-full py-3 min-h-[44px] rounded-xl text-sm font-semibold flex items-center justify-center cursor-pointer"
                   style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
                   Close
                 </button>
@@ -338,7 +346,7 @@ export function LeaderboardPage() {
 
         {meta && (
           <button onClick={() => navigate(`/quiz/${quizId}/setup`)}
-            className="w-full py-3 rounded-xl font-bold text-sm hover:scale-[1.02] transition-all"
+            className="w-full py-3 min-h-[48px] rounded-xl font-bold text-sm hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center"
             style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}>
             Take This Quiz →
           </button>

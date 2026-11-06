@@ -201,14 +201,18 @@ export function AnalyticsPage() {
                   {/* Success rate pie */}
                   <div className="glow-card p-4">
                     <p className="text-sm font-bold mb-3">Success vs Failure Rate</p>
-                    <div className="flex items-center gap-4">
-                      <PieChart width={130} height={130}>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
-                          {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
-                        </Pie>
-                        <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                      </PieChart>
-                      <div className="flex flex-col gap-3 flex-1">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-[130px] h-[130px] shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
+                              {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                            </Pie>
+                            <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex flex-col gap-3 flex-1 w-full">
                         {pieData.map((d, i) => (
                           <div key={d.name}>
                             <div className="flex items-center gap-2 mb-1">
@@ -297,7 +301,7 @@ export function AnalyticsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--muted-foreground))" }}>
                   Select Two Students to Compare
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs font-semibold mb-1.5" style={{ color: "#6366f1" }}>Student 1</p>
                     <select value={compare1} onChange={(e) => setCompare1(e.target.value)}
@@ -329,7 +333,7 @@ export function AnalyticsPage() {
               {compareData && compareData.length === 2 && (
                 <>
                   {/* Summary cards */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {compareData.map((d, i) => (
                       <div key={d.userName} className="glow-card p-4" style={{ borderColor: i === 0 ? "rgba(99,102,241,0.4)" : "rgba(245,158,11,0.4)" }}>
                         <p className="text-xs font-bold mb-2 truncate" style={{ color: i === 0 ? "#a78bfa" : "#fbbf24" }}>{d.userName}</p>
@@ -434,7 +438,7 @@ export function AnalyticsPage() {
               ) : (
                 <>
                   {/* Head-to-head summary */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {([
                       { g: "male", data: gvbData.male, color: "#60a5fa", border: "rgba(59,130,246,0.4)", emoji: "👦", label: "Boys" },
                       { g: "female", data: gvbData.female, color: "#f472b6", border: "rgba(236,72,153,0.4)", emoji: "👧", label: "Girls" },
