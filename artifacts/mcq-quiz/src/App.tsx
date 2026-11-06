@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Router, Route, Switch, useLocation } from "wouter";
+import { Router, Route, Switch, useLocation, Redirect } from "wouter";
 import { AnimatePresence } from "framer-motion";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -195,6 +195,9 @@ function AppInner() {
           <Route path="/quiz/:quizId/result"      component={ResultPage} />
           <Route path="/quiz/:quizId/leaderboard" component={LeaderboardPage} />
           <Route path="/leaderboard"              component={LeaderboardPage} />
+          <Route path="/analytics">
+            <Redirect to="/" replace />
+          </Route>
           <Route path="/profile"    component={ProfilePage} />
           <Route path="/vault"      component={VaultPage} />
           <Route path="/revision"   component={RevisionPage} />
