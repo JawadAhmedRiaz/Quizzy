@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
-import { useRevisionStats } from "@/lib/revisionTracker";
+import { useRevisionStats, syncMistakesFromDatabase } from "@/lib/revisionTracker";
 
 export function BottomNavbar() {
   const [location, navigate] = useLocation();
@@ -11,6 +11,12 @@ export function BottomNavbar() {
   const { isAdmin } = useUser();
   const revisionStats = useRevisionStats();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      syncMistakesFromDatabase();
+    }
+  }, [isAuthenticated]);
 
   // Close more menu when route changes
   useEffect(() => {

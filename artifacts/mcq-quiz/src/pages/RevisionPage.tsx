@@ -8,6 +8,7 @@ import {
   getAllMistakes,
   markMistakeMastered,
   deleteMistake,
+  clearAllMasteredMistakes,
   useRevisionStats,
   syncMistakesFromDatabase,
   type MistakeRecord,
@@ -36,11 +37,14 @@ export function RevisionPage() {
   const { displayName } = useUser();
   const stats = useRevisionStats();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
-  // Sync mistakes from database on mount (e.g. from past exams)
+  // Sync mistakes from database on mount (authoritative for session user)
   useEffect(() => {
     setIsSyncing(true);
-    syncMistakesFromDatabase(displayName || undefined).then((synced) => {
+    syncMistakesFromDatabase().then((synced) => {
       setMistakes(synced);
       setIsSyncing(false);
     });
@@ -119,21 +123,45 @@ export function RevisionPage() {
     setCardIndex(0);
   };
 
-  const handleToggleMastered = (id: string, currentState: boolean) => {
-    markMistakeMastered(id, !currentState);
-    setMistakes(getAllMistakes());
-    // Auto-advance if marking as mastered in flashcard mode
-    if (!currentState && activeTab === "pending") {
-      setIsFlipped(false);
+  const handleToggleMastered = async (id: string, currentState: boolean) => {
+    try {
+      setActionError(null);
+      await markMistakeMastered(id, !currentState);
+      setMistakes(getAllMistakes());
+      // Auto-advance if marking as mastered in flashcard mode
+      if (!currentState && activeTab === "pending") {
+        setIsFlipped(false);
+      }
+    } catch (err: any) {
+      setActionError(err.message || "Failed to update card status");
     }
   };
 
-  const handleDeleteMistake = (id: string) => {
-    deleteMistake(id);
-    const updated = getAllMistakes();
-    setMistakes(updated);
-    setIsFlipped(false);
-    setCardIndex((prev) => Math.max(0, Math.min(prev, updated.length - 1)));
+  const handleDeleteMistake = async (id: string) => {
+    try {
+      setActionError(null);
+      await deleteMistake(id);
+      const updated = getAllMistakes();
+      setMistakes(updated);
+      setIsFlipped(false);
+      setCardIndex((prev) => Math.max(0, Math.min(prev, updated.length - 1)));
+    } catch (err: any) {
+      setActionError(err.message || "Failed to delete revision card");
+    }
+  };
+
+  const handleClearMastered = async () => {
+    try {
+      setIsClearing(true);
+      setActionError(null);
+      await clearAllMasteredMistakes();
+      setMistakes(getAllMistakes());
+      setShowClearConfirm(false);
+    } catch (err: any) {
+      setActionError(err.message || "Failed to clear mastered cards");
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   // Keyboard navigation for flashcards
@@ -178,6 +206,22 @@ export function RevisionPage() {
       <TopNavbar />
 
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col items-center">
+        {/* ─── ACTION ERROR ALERT BANNER ─── */}
+        {actionError && (
+          <div className="w-full mb-5 flex items-center justify-between rounded-xl bg-destructive/15 border border-destructive/30 px-4 py-3 text-sm text-destructive font-medium shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button
+              onClick={() => setActionError(null)}
+              className="text-xs hover:underline shrink-0 ml-3 min-h-[32px] px-2 flex items-center cursor-pointer font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* ─── HEADER BANNER ─── */}
         <div className="text-center mb-6 w-full">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mb-3 shadow-xs">
@@ -299,6 +343,17 @@ export function RevisionPage() {
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
                 <span>Test as Quiz ({filteredMistakes.length})</span>
+              </button>
+            )}
+
+            {activeTab === "mastered" && stats.mastered > 0 && (
+              <button
+                onClick={() => setShowClearConfirm(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 border border-destructive/30 transition-all cursor-pointer active:scale-95"
+                title="Permanently remove all mastered cards"
+              >
+                <Trash2 className="w-4 h-4 shrink-0" />
+                <span>Clear Mastered ({stats.mastered})</span>
               </button>
             )}
           </div>
@@ -674,6 +729,48 @@ export function RevisionPage() {
             ))}
           </div>
         )}
+
+        {/* ─── CONFIRM CLEAR MASTERED DIALOG ─── */}
+        <AnimatePresence>
+          {showClearConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl text-card-foreground"
+              >
+                <div className="flex items-center gap-3 text-destructive mb-3">
+                  <div className="p-2 rounded-xl bg-destructive/10">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-base">Clear Mastered Cards?</h3>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-5">
+                  This will permanently delete all <strong>{stats.mastered}</strong> mastered questions from your revision archive. This action cannot be undone.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isClearing}
+                    onClick={() => setShowClearConfirm(false)}
+                    className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted/60 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isClearing}
+                    onClick={handleClearMastered}
+                    className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-xs font-bold hover:bg-destructive/90 transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    {isClearing ? "Clearing..." : "Yes, Clear All"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

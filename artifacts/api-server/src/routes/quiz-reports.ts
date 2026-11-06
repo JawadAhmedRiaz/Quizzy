@@ -165,24 +165,12 @@ router.post("/quiz-reports", async (req, res): Promise<void> => {
     })
     .returning();
 
-  // Atomic upsert of mistakes into revisionCardsTable
-  try {
-    const rawAnswers = JSON.parse(parsed.data.answersJson || "[]");
-    if (Array.isArray(rawAnswers) && rawAnswers.length > 0) {
-      const users = await db.select().from(usersTable);
-      const profiles = await db.select().from(profilesTable);
-
-      const matchedUser =
-        users.find(
-          (u) =>
-            u.id === parsed.data.userName ||
-            u.email?.toLowerCase() === parsed.data.userName.toLowerCase() ||
-            cleanName.toLowerCase() === (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim().toLowerCase() : "")
-        ) || profiles.find((p) => p.displayName?.trim().toLowerCase() === cleanName.toLowerCase());
-
-      const targetUserId = matchedUser ? ("id" in matchedUser ? matchedUser.id : matchedUser.userId) : null;
-
-      if (targetUserId) {
+  // Atomic upsert of mistakes into revisionCardsTable strictly for authenticated session
+  if (req.isAuthenticated() && req.user?.id) {
+    try {
+      const targetUserId = req.user.id;
+      const rawAnswers = JSON.parse(parsed.data.answersJson || "[]");
+      if (Array.isArray(rawAnswers) && rawAnswers.length > 0) {
         const allQuestions = await db.select().from(questionsTable);
         const qBankMap = new Map<string, (typeof allQuestions)[0]>();
         allQuestions.forEach((q) => {
@@ -249,9 +237,9 @@ router.post("/quiz-reports", async (req, res): Promise<void> => {
           }
         }
       }
+    } catch (err) {
+      req.log?.warn?.({ err }, "Failed to upsert revision cards during quiz submission");
     }
-  } catch (err) {
-    req.log?.warn?.({ err }, "Failed to upsert revision cards during quiz submission");
   }
 
   res.status(201).json({

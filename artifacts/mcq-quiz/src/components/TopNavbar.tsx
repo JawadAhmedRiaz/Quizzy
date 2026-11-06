@@ -41,7 +41,7 @@ export function TopNavbar(_props: Props = {}) {
   }, []);
 
   useEffect(() => {
-    syncMistakesFromDatabase(displayName || undefined);
+    syncMistakesFromDatabase();
   }, [displayName]);
 
   return (

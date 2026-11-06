@@ -4,6 +4,7 @@ import type { QuizAnswer } from "@/context/QuizContext";
 
 const STORAGE_KEY = "quizzy_revision_mistakes_v1";
 const DELETED_STORAGE_KEY = "quizzy_revision_deleted_v1";
+const CLEANUP_KEY = "quizzy_revision_cleanup_v2";
 
 export function getDeletedMistakeKeys(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -35,6 +36,7 @@ export function unmarkDeletedMistakeKey(key: string) {
 
 export interface MistakeRecord {
   id: string;
+  dbId?: number;
   quizId: string;
   subject: string;
   semester?: string | number;
@@ -45,6 +47,7 @@ export interface MistakeRecord {
   mastered: boolean;
   masteredAt?: string;
   reviewCount: number;
+  mistakeCount?: number;
 }
 
 export interface RevisionStats {
@@ -65,7 +68,6 @@ function notifyListeners() {
 }
 
 function generateId(quizId: string, qText: string): string {
-  // Simple stable string hash
   let hash = 0;
   const str = `${quizId}::${qText.trim()}`;
   for (let i = 0; i < str.length; i++) {
@@ -111,21 +113,18 @@ export function recordMistakesFromQuiz(
   let hasChanges = false;
 
   answers.forEach((ans) => {
-    // Only capture incorrect answers (exclude skipped or correct)
     if (!ans.isCorrect && !ans.skipped && ans.question) {
       unmarkDeletedMistakeKey(ans.question.q);
       const id = generateId(quizId, ans.question.q);
       const existing = currentMap.get(id);
 
       if (existing) {
-        // Already exists: update timestamp and un-master if answered wrong again
         existing.wrongAt = new Date().toISOString();
         existing.selectedOptionIndex = ans.selectedOptionIndex;
-        existing.mastered = false; // re-challenge student
+        existing.mastered = false;
         existing.reviewCount = (existing.reviewCount || 0) + 1;
         currentMap.set(id, existing);
       } else {
-        // Brand new mistake
         const newRecord: MistakeRecord = {
           id,
           quizId,
@@ -149,17 +148,29 @@ export function recordMistakesFromQuiz(
   }
 }
 
-export function markMistakeMastered(id: string, mastered: boolean = true) {
+/**
+ * Updates mastery status directly in PostgreSQL and local cache
+ */
+export async function markMistakeMastered(id: string, mastered: boolean = true): Promise<void> {
   const current = getAllMistakes();
   const toUpdate = current.find((m) => m.id === id);
-  if (toUpdate && toUpdate.id.startsWith("card_")) {
-    fetch(`/api/revision-cards/${toUpdate.id}/master`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ mastered }),
-    }).catch(() => {});
+
+  const res = await fetch(`/api/revision-cards/${encodeURIComponent(id)}/master`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ mastered }),
+  });
+
+  if (!res.ok) {
+    let errorMsg = `Server returned ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.error) errorMsg = errJson.error;
+    } catch {}
+    throw new Error(errorMsg);
   }
+
   const updated = current.map((m) => {
     if (m.id === id) {
       return {
@@ -174,74 +185,99 @@ export function markMistakeMastered(id: string, mastered: boolean = true) {
   saveMistakes(updated);
 }
 
-export function deleteMistake(id: string) {
+/**
+ * Deletes a revision card from PostgreSQL by ID, awaiting server confirmation
+ */
+export async function deleteMistake(id: string): Promise<void> {
   const current = getAllMistakes();
   const toDelete = current.find((m) => m.id === id);
-  if (toDelete) {
-    if (toDelete.question?.q) {
-      saveDeletedMistakeKey(toDelete.question.q);
-    }
-    const endpoint = toDelete.id.startsWith("card_")
-      ? `/api/revision-cards/${toDelete.id}`
-      : `/api/revision-cards/${id}`;
 
-    fetch(endpoint, {
-      method: "DELETE",
-      credentials: "include",
-    }).catch(() => {});
+  const res = await fetch(`/api/revision-cards/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    let errorMsg = `Failed to delete revision card (HTTP ${res.status})`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.error) errorMsg = errJson.error;
+    } catch {}
+    throw new Error(errorMsg);
   }
+
+  if (toDelete?.question?.q) {
+    saveDeletedMistakeKey(toDelete.question.q);
+  }
+
   const updated = current.filter((m) => m.id !== id);
   saveMistakes(updated);
 }
 
-export function clearAllMasteredMistakes() {
-  const current = getAllMistakes();
-  fetch("/api/revision-cards", {
+/**
+ * Bulk clear all mastered cards from PostgreSQL and local cache
+ */
+export async function clearAllMasteredMistakes(): Promise<void> {
+  const res = await fetch("/api/revision-cards", {
     method: "DELETE",
     credentials: "include",
-  }).catch(() => {});
+  });
+
+  if (!res.ok) {
+    let errorMsg = `Failed to clear mastered cards (HTTP ${res.status})`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.error) errorMsg = errJson.error;
+    } catch {}
+    throw new Error(errorMsg);
+  }
+
+  const current = getAllMistakes();
   const updated = current.filter((m) => !m.mastered);
   saveMistakes(updated);
 }
 
 /**
- * Synchronizes revision cards directly from PostgreSQL database
+ * One-time cleanup of legacy derived keys and local mistakes cache
  */
-export async function syncMistakesFromDatabase(userName?: string): Promise<MistakeRecord[]> {
-  if (
-    typeof window === "undefined" ||
-    !userName ||
-    !userName.trim() ||
-    userName.trim().toLowerCase().startsWith("guest")
-  ) {
-    return getAllMistakes();
-  }
+function ensureOneTimeCleanup(): void {
+  if (typeof window === "undefined") return;
   try {
-    const query = userName ? `?userName=${encodeURIComponent(userName)}` : "";
-    const res = await fetch(`/api/revision-cards${query}`, { credentials: "include" });
+    if (!localStorage.getItem(CLEANUP_KEY)) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(DELETED_STORAGE_KEY);
+      localStorage.setItem(CLEANUP_KEY, "true");
+      saveMistakes([]);
+    }
+  } catch {}
+}
+
+/**
+ * Synchronizes revision cards directly from PostgreSQL database for session user
+ */
+export async function syncMistakesFromDatabase(_ignoredUserName?: string): Promise<MistakeRecord[]> {
+  if (typeof window === "undefined") return getAllMistakes();
+
+  ensureOneTimeCleanup();
+
+  try {
+    const res = await fetch("/api/revision-cards", { credentials: "include" });
     if (res.ok) {
       const dbCards = await res.json();
-      if (Array.isArray(dbCards) && dbCards.length > 0) {
+      if (Array.isArray(dbCards)) {
+        // Database is the absolute authority: update cache with genuine server cards
         saveMistakes(dbCards);
         return dbCards;
       }
+    } else if (res.status === 401) {
+      // Unauthenticated / guest session: keep local state
+      return getAllMistakes();
     }
-
-    // Fallback to legacy endpoint if transition in progress
-    const legacyRes = await fetch(`/api/quiz-reports/mistakes${query}`);
-    if (legacyRes.ok) {
-      const dbMistakes: MistakeRecord[] = await legacyRes.json();
-      if (Array.isArray(dbMistakes) && dbMistakes.length > 0) {
-        saveMistakes(dbMistakes);
-        return dbMistakes;
-      }
-    }
-
-    return getAllMistakes();
   } catch (err) {
-    console.error("Failed to sync mistakes with DB:", err);
-    return getAllMistakes();
+    console.error("Failed to sync revision cards from DB:", err);
   }
+
+  return getAllMistakes();
 }
 
 export function getRevisionStats(): RevisionStats {
@@ -272,7 +308,6 @@ export function useRevisionStats(): RevisionStats {
   useEffect(() => {
     const update = () => setStats(getRevisionStats());
     listeners.add(update);
-    // Also listen to storage events from other tabs
     window.addEventListener("storage", update);
 
     return () => {

@@ -27,7 +27,12 @@ export async function authMiddleware(
 ) {
   try {
     // 1. Clerk Authentication Authority
-    const auth = getAuth(req);
+    let auth: any = null;
+    if (process.env.CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY) {
+      try {
+        auth = getAuth(req);
+      } catch {}
+    }
     if (auth && auth.userId) {
       const clerkUserId = auth.userId;
 
