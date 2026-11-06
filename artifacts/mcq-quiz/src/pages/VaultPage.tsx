@@ -207,6 +207,48 @@ export function VaultPage() {
     setPreviewDoc(item);
   };
 
+  // Open Office file in a new tab with view.aspx (same as phone flow, fresh normal signed URL)
+  const handleOpenOfficeNewTab = (doc: VaultDoc) => {
+    if (!doc) return;
+    const newTab = window.open("about:blank", "_blank");
+    if (newTab) {
+      try {
+        newTab.document.write("<p style='font-family:system-ui,-apple-system,sans-serif;text-align:center;padding-top:40px;color:#64748b;font-size:14px;'>Loading document viewer...</p>");
+      } catch {}
+    }
+
+    fetch(`${API}/vault/${doc.id}/file-url`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            throw new Error("Access restricted. Please sign in with an authorized student account.");
+          }
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to load document link.");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        const rawUrl = data.url;
+        const targetUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(rawUrl)}`;
+        const googleUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}`;
+
+        if (newTab && !newTab.closed) {
+          newTab.location.href = targetUrl;
+        } else {
+          setFallbackOpen({ url: targetUrl, title: doc.title, googleUrl });
+        }
+      })
+      .catch((err) => {
+        if (newTab && !newTab.closed) {
+          try {
+            newTab.document.write(`<p style='font-family:system-ui,-apple-system,sans-serif;text-align:center;padding-top:40px;color:#ef4444;font-size:14px;'>${err.message}</p>`);
+          } catch {}
+        }
+        alert(err.message || "Failed to open document.");
+      });
+  };
+
   // Handle direct download: forces Content-Disposition attachment via ?download=1
   const handleDirectDownload = async (doc: VaultDoc, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -887,7 +929,7 @@ export function VaultPage() {
                                 <span>📊</span>
                                 <span>Office Online Viewer</span>
                               </span>
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2.5 sm:gap-3">
                                 <a
                                   href={`https://docs.google.com/viewer?url=${encodeURIComponent(previewUrl)}`}
                                   target="_blank"
@@ -896,6 +938,15 @@ export function VaultPage() {
                                 >
                                   Try Google viewer <ExternalLink className="w-3 h-3" />
                                 </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenOfficeNewTab(previewDoc)}
+                                  className="px-3 py-1 rounded-lg font-bold text-foreground bg-muted hover:bg-muted/80 border border-border shadow flex items-center gap-1.5 transition-colors"
+                                  title="Open in new tab"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Open in new tab</span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDirectDownload(previewDoc)}
