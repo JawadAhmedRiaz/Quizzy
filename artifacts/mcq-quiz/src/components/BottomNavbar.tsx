@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
 import { useRevisionStats } from "@/lib/revisionTracker";
 
 export function BottomNavbar() {
   const [location, navigate] = useLocation();
+  const { isAuthenticated, logout } = useAuth();
   const { isAdmin } = useUser();
   const revisionStats = useRevisionStats();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -117,6 +119,20 @@ export function BottomNavbar() {
                   );
                 })}
               </div>
+
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    logout();
+                  }}
+                  className="flex items-center justify-center gap-2 w-full mt-3 py-3 rounded-2xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all min-h-[44px] cursor-pointer"
+                >
+                  <span>🚪</span>
+                  <span>Sign Out</span>
+                </button>
+              )}
             </motion.div>
           </>
         )}

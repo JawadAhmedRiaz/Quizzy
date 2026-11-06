@@ -4,7 +4,6 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { useUser } from "@/context/UserContext";
 import { useSettings } from "@/context/SettingsContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Sidebar } from "@/components/Sidebar";
 import { useRevisionStats, syncMistakesFromDatabase } from "@/lib/revisionTracker";
 import { renderAvatarSvg, getSavedAvatarId } from "@/components/AnimatedAvatar";
 
@@ -28,7 +27,6 @@ export function TopNavbar(_props: Props = {}) {
 
   const avatarInitial = (displayName?.[0] ?? "U").toUpperCase();
   const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handleAvatarUpdate = () => {
@@ -47,8 +45,7 @@ export function TopNavbar(_props: Props = {}) {
   }, [displayName]);
 
   return (
-    <>
-      <header className="top-navbar w-full px-3.5 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-40 backdrop-blur-md bg-[#FAF7F2]/90 border-b border-[#E6DFD3] shadow-xs">
+    <header className="top-navbar w-full px-3.5 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-40 backdrop-blur-md bg-[#FAF7F2]/90 border-b border-[#E6DFD3] shadow-xs">
         {/* ── TOP LEFT: LOGO ── */}
         <div className="flex items-center flex-shrink-0">
           <Link
@@ -251,37 +248,7 @@ export function TopNavbar(_props: Props = {}) {
             {renderAvatarSvg(avatarId, 36)}
           </div>
         </Link>
-
-        {/* Mobile Hamburger Button (opens Sidebar drawer) */}
-        <button
-          type="button"
-          onClick={() => {
-            setSidebarOpen(true);
-            if (_props.onOpenSidebar) _props.onOpenSidebar();
-          }}
-          className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-          aria-label="Open navigation menu"
-          title="Open Menu"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="4" x2="20" y1="6" y2="6" />
-            <line x1="4" x2="20" y1="12" y2="12" />
-            <line x1="4" x2="20" y1="18" y2="18" />
-          </svg>
-        </button>
       </div>
     </header>
-
-    {/* Render mobile Sidebar drawer */}
-    <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-  </>
   );
 }
