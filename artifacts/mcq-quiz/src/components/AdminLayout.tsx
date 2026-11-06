@@ -43,7 +43,7 @@ interface Props { children: ReactNode }
 
 export function AdminLayout({ children }: Props) {
   const [location, navigate] = useLocation();
-  const { isAdmin, isGuest } = useUser();
+  const { isAdmin } = useUser();
 
   const lastStudentPage =
     typeof window !== "undefined"
@@ -74,7 +74,7 @@ export function AdminLayout({ children }: Props) {
     }
   };
 
-  if (isGuest || !isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f172a" }}>
         <div className="text-center">

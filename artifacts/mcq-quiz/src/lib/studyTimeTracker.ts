@@ -69,8 +69,7 @@ function getTodayStr(): string {
 
 export function getUserStorageKey(userIdentifier?: string): string {
   if (!userIdentifier || !userIdentifier.trim()) {
-    const guestId = typeof window !== "undefined" ? localStorage.getItem("quizzy_guest_id") : null;
-    return guestId ? `quizzy_study_time_${guestId}` : "quizzy_study_time_guest";
+    return "quizzy_study_time_default";
   }
   const clean = userIdentifier.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
   return `quizzy_study_time_${clean}`;
@@ -167,7 +166,7 @@ export async function syncStudyTimeFromDatabase(userIdentifier?: string): Promis
     typeof window === "undefined" ||
     !userIdentifier ||
     !userIdentifier.trim() ||
-    userIdentifier.trim().toLowerCase() === "guest scholar" ||
+    userIdentifier.trim().toLowerCase().startsWith("guest") ||
     userIdentifier.trim().toLowerCase() === "user"
   ) {
     return null;
@@ -223,7 +222,7 @@ export function useWeeklyStudyTimeData(userIdentifier?: string) {
 
     if (
       userIdentifier &&
-      userIdentifier.trim().toLowerCase() !== "guest scholar" &&
+      !userIdentifier.trim().toLowerCase().startsWith("guest") &&
       userIdentifier.trim().toLowerCase() !== "user"
     ) {
       syncStudyTimeFromDatabase(userIdentifier).then((syncedMap) => {

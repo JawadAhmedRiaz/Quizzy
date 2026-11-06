@@ -25,7 +25,7 @@ export function AnalyticsPage() {
   const initialTab: Tab = typeof window !== "undefined" && window.location.search.includes("tab=compare") ? "compare" : typeof window !== "undefined" && window.location.search.includes("tab=gvb") ? "gvb" : "mine";
   const [tab, setTab] = useState<Tab>(initialTab);
   const { user, isAuthenticated } = useAuth();
-  const { effectiveUserId, displayName, isGuest } = useUser();
+  const { effectiveUserId, displayName } = useUser();
   const [gvbData, setGvbData] = useState<{ male: GenderStats; female: GenderStats } | null>(null);
   const [gvbLoading, setGvbLoading] = useState(false);
 
@@ -122,15 +122,6 @@ export function AnalyticsPage() {
           </button>
         </div>
 
-        {/* Guest notice */}
-        {isGuest && (
-          <div className="rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs"
-            style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.25)", color: "#fbbf24" }}>
-            <span>👤</span>
-            <span>Viewing as guest — your scores are saved to this device. Log in to sync across devices.</span>
-          </div>
-        )}
-
         {/* Tabs */}
         <div className="flex rounded-xl p-1 gap-1" style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}>
           {([
@@ -166,7 +157,6 @@ export function AnalyticsPage() {
                   <p className="font-semibold mb-1">No quiz history yet</p>
                   <p className="text-sm mb-4" style={{ color: "hsl(var(--muted-foreground))" }}>
                     Complete a quiz to see your analytics here.
-                    {isGuest && " Your scores are saved to this device."}
                   </p>
                   <button onClick={() => navigate("/")}
                     className="px-5 py-2.5 rounded-xl text-sm font-bold"
@@ -183,14 +173,14 @@ export function AnalyticsPage() {
                         <img src={user.profileImageUrl} alt="" className="w-10 h-10 rounded-full" style={{ border: "2px solid rgba(99,102,241,0.5)" }} />
                       ) : (
                         <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-                          style={{ background: isGuest ? "linear-gradient(135deg,#fbbf24,#f59e0b)" : "linear-gradient(135deg, #3b82f6, #6366f1)", color: isGuest ? "#1a1a2e" : "#fff" }}>
-                          {isGuest ? "👤" : avatarLetter}
+                          style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "#fff" }}>
+                          {avatarLetter}
                         </div>
                       )}
                       <div>
                         <p className="font-bold">{displayName}</p>
                         <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
-                          {isGuest ? "Guest · your personal stats" : "Your personal stats"}
+                          Your personal stats
                         </p>
                       </div>
                     </div>

@@ -1,10 +1,6 @@
 import { useAuth } from "@workspace/replit-auth-web";
 import "./LoginPage.css";
 
-interface Props {
-  onContinueAsGuest: (firstName: string, surname: string, gender: string) => void;
-}
-
 function CyberButton({
   children,
   onClick,
@@ -35,7 +31,7 @@ function CyberButton({
   );
 }
 
-export function LoginPage({ onContinueAsGuest }: Props) {
+export function LoginPage() {
   const { openAuthModal, openRegisterModal } = useAuth();
 
   return (

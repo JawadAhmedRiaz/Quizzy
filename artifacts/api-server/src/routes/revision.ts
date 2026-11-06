@@ -30,7 +30,7 @@ async function resolveInternalUserId(reqUserId?: string, queryParam?: string): P
   }
 
   const query = (queryParam || reqUserId || "").trim().toLowerCase();
-  if (!query || query === "guest" || query === "guest scholar" || query === "user") {
+  if (!query || query.startsWith("guest") || query === "user") {
     return null;
   }
 

@@ -261,7 +261,6 @@ router.post("/auth/verify-email", async (req: Request, res: Response) => {
         .values({
           userId: user.id,
           displayName: initialDisplayName,
-          isGuest: false,
         })
         .onConflictDoNothing();
     } catch {}

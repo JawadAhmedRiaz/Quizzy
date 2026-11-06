@@ -77,7 +77,7 @@ export function Sidebar({ open, onClose }: Props) {
                 {/* Profile top */}
                 <div className="p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "hsl(var(--muted-foreground))" }}>👤 Profile</p>
-                  {isAuthenticated && user ? (
+                  {isAuthenticated && user && (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-blue-500/60 bg-[#0B132B] shrink-0">
@@ -99,30 +99,6 @@ export function Sidebar({ open, onClose }: Props) {
                           className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
                           style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", border: "1px solid hsl(var(--border))" }}>
                           Log out
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-amber-500/60 bg-[#0B132B] shrink-0">
-                          {renderAvatarSvg(avatarId, 40)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold">{displayName}</p>
-                          <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>Guest · {effectiveUserId?.slice(0, 14) ?? "..."}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => goTo("/profile")}
-                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                          style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>
-                          Edit Profile
-                        </button>
-                        <button onClick={login}
-                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                          style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff" }}>
-                          Log in
                         </button>
                       </div>
                     </div>

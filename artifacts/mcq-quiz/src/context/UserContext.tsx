@@ -15,7 +15,6 @@ export interface UserProfile {
   streakLastDate: string | null;
   freezesAvailable: number;
   notificationsEnabled: boolean;
-  isGuest: boolean;
 }
 
 interface GamificationData {
@@ -31,7 +30,6 @@ interface GamificationData {
 
 interface UserContextValue {
   effectiveUserId: string | null;
-  isGuest: boolean;
   isAdmin: boolean;
   profile: UserProfile | null;
   gamification: GamificationData | null;
@@ -42,25 +40,6 @@ interface UserContextValue {
   profileComplete: boolean;
 }
 
-function getStoredGuestId(): string | null {
-  if (typeof window === "undefined") return null;
-  // ONLY return guest ID if guest mode was explicitly chosen
-  if (!localStorage.getItem("quizzy_guest_continued")) return null;
-  return localStorage.getItem("quizzy_guest_id");
-}
-
-function getGuestDisplayName(): string | null {
-  const first = localStorage.getItem("quizzy_guest_firstname");
-  const surname = localStorage.getItem("quizzy_guest_surname");
-  if (first && surname) return `${first} ${surname}`;
-  if (first) return first;
-  return null;
-}
-
-function getGuestGender(): string | null {
-  return localStorage.getItem("quizzy_guest_gender");
-}
-
 const UserContext = createContext<UserContextValue | null>(null);
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -69,29 +48,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [gamification, setGamification] = useState<GamificationData | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [guestId, setGuestId] = useState<string | null>(() => getStoredGuestId());
 
-  // Listen for explicit guest activation or logout events
-  useEffect(() => {
-    const handleGuestChange = () => {
-      setGuestId(getStoredGuestId());
-    };
-    window.addEventListener("quizzy_profile_updated", handleGuestChange);
-    window.addEventListener("storage", handleGuestChange);
-    return () => {
-      window.removeEventListener("quizzy_profile_updated", handleGuestChange);
-      window.removeEventListener("storage", handleGuestChange);
-    };
-  }, []);
-
-  // Effective user ID is strictly null if signed out and no explicit guest mode chosen
   const effectiveUserId: string | null = isLoading
     ? null
     : isAuthenticated && user
     ? (user.id ?? user.email ?? null)
-    : guestId;
-
-  const isGuest = !isAuthenticated && !!guestId;
+    : null;
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) {
@@ -116,25 +78,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const data = await r.json();
         if (data) {
           setProfile(data);
-        } else if (isGuest) {
-          const guestName = getGuestDisplayName();
-          const guestGender = getGuestGender();
-          const created = await fetch(`${API}/profile`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: effectiveUserId,
-              displayName: guestName,
-              gender: guestGender,
-              isGuest: true,
-            }),
-          });
-          if (created.ok) setProfile(await created.json());
         }
       }
     } catch {}
     setProfileLoaded(true);
-  }, [effectiveUserId, isGuest]);
+  }, [effectiveUserId]);
 
   const refreshGamification = useCallback(async () => {
     if (!effectiveUserId) {
@@ -170,11 +118,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     [effectiveUserId],
   );
 
-  const [guestVersion, setGuestVersion] = useState(0);
-
   useEffect(() => {
     const handleUpdate = () => {
-      setGuestVersion((v) => v + 1);
       refreshProfile();
     };
     window.addEventListener("quizzy_profile_updated", handleUpdate);
@@ -193,14 +138,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setGamification(null);
     }
-  }, [effectiveUserId, guestVersion]);
+  }, [effectiveUserId, refreshProfile, refreshGamification]);
 
   const authDisplayName =
     isAuthenticated && user
       ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || null
       : null;
-
-  const currentGuestName = isGuest ? getGuestDisplayName() : null;
 
   const profileDisplayName =
     profile?.displayName && profile.displayName.trim() && profile.displayName !== "Guest"
@@ -210,8 +153,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const displayName =
     profileDisplayName ||
     authDisplayName ||
-    currentGuestName ||
-    (isGuest ? "Guest Scholar" : "Student");
+    (user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Student");
 
   const profileComplete = !!(
     profile?.displayName &&
@@ -225,7 +167,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     <UserContext.Provider
       value={{
         effectiveUserId,
-        isGuest,
         isAdmin,
         profile,
         gamification,

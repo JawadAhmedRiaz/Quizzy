@@ -35,7 +35,7 @@ function xpLevelInfo(xp: number) {
 export function ProfilePage() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, login, logout, refresh: refreshAuth } = useAuth();
-  const { profile, gamification, saveProfile, refreshProfile, isGuest } = useUser();
+  const { profile, gamification, saveProfile, refreshProfile } = useUser();
 
   // Avatar state
   const [avatarId, setAvatarId] = useState(() => getSavedAvatarId());
@@ -83,14 +83,7 @@ export function ProfilePage() {
       setSection(profile.section ?? "");
       setGender(profile.gender ?? "");
     }
-    if (isGuest) {
-      const first = localStorage.getItem("quizzy_guest_firstname") ?? "";
-      const sur = localStorage.getItem("quizzy_guest_surname") ?? "";
-      const g = localStorage.getItem("quizzy_guest_gender") ?? "";
-      if (!profile?.displayName && first) setDisplayName(`${first} ${sur}`.trim());
-      if (!profile?.gender && g) setGender(g);
-    }
-  }, [profile, isGuest]);
+  }, [profile]);
 
   async function handleSave() {
     setSaving(true);
@@ -110,14 +103,6 @@ export function ProfilePage() {
       return;
     }
 
-    if (isGuest) {
-      const parts = displayName.trim().split(" ");
-      const first = parts[0] || "";
-      const sur = parts.slice(1).join(" ") || "";
-      if (first) localStorage.setItem("quizzy_guest_firstname", first);
-      if (sur) localStorage.setItem("quizzy_guest_surname", sur);
-      if (gender) localStorage.setItem("quizzy_guest_gender", gender);
-    }
     if (semester) {
       localStorage.setItem("quizzy_student_sem", String(semester));
       window.dispatchEvent(new Event("quizzy_semester_updated"));
@@ -178,13 +163,6 @@ export function ProfilePage() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      if (isGuest) {
-        localStorage.removeItem("quizzy_guest_continued");
-        localStorage.removeItem("quizzy_guest_id");
-        localStorage.removeItem("quizzy_guest_firstname");
-        localStorage.removeItem("quizzy_guest_surname");
-        localStorage.removeItem("quizzy_guest_gender");
-      }
       await logout();
     } catch {
       window.location.href = "/";
@@ -196,7 +174,7 @@ export function ProfilePage() {
   const lvl = xpLevelInfo(xp);
   const xpPct = lvl.next === Infinity ? 100 : Math.round(((xp - lvl.cur) / (lvl.next - lvl.cur)) * 100);
   const streakCount = gamification?.streakCount ?? profile?.streakCount ?? 0;
-  const displayNameFirst = displayName || (isGuest ? "Guest Scholar" : user?.firstName || "Student");
+  const displayNameFirst = displayName || user?.firstName || "Student";
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
@@ -218,26 +196,7 @@ export function ProfilePage() {
               <h1 className="text-xl font-black" style={{ fontFamily: "'Poppins', sans-serif" }}>
                 👤 Student Profile
               </h1>
-              {isGuest ? (
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>
-                    Guest Mode
-                  </span>
-                  <button
-                    onClick={login}
-                    className="text-xs font-semibold px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
-                    style={{
-                      background: "rgba(99,102,241,0.2)",
-                      color: "#a5b4fc",
-                      border: "1px solid rgba(99,102,241,0.4)",
-                    }}
-                  >
-                    Log In / Register →
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              )}
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
           </div>
         </div>
@@ -451,103 +410,87 @@ export function ProfilePage() {
             <span>Security & Password</span>
           </p>
 
-          {isGuest ? (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-400">
-              <p className="font-bold mb-1">Guest Account</p>
-              <p className="text-[11px] mb-2.5">
-                Password protection is available for registered student accounts.
-              </p>
-              <button
-                type="button"
-                onClick={login}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow"
-              >
-                Create Account or Log In
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
-              {passwordError && (
-                <div className="p-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400">
-                  {passwordError}
-                </div>
-              )}
-              {passwordSuccess && (
-                <div className="p-2.5 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                  ✓ {passwordSuccess}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-muted-foreground">Current Password</label>
-                <div className="relative">
-                  <input
-                    type={showCurrentPass ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPass(!showCurrentPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    {showCurrentPass ? "🙈" : "👁️"}
-                  </button>
-                </div>
+          <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
+            {passwordError && (
+              <div className="p-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400">
+                {passwordError}
               </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-muted-foreground">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showNewPass ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPass(!showNewPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    {showNewPass ? "🙈" : "👁️"}
-                  </button>
-                </div>
+            )}
+            {passwordSuccess && (
+              <div className="p-2.5 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                ✓ {passwordSuccess}
               </div>
+            )}
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-muted-foreground">Confirm New Password</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted-foreground">Current Password</label>
+              <div className="relative">
                 <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter new password"
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                  type={showCurrentPass ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPass(!showCurrentPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {showCurrentPass ? "🙈" : "👁️"}
+                </button>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={passwordSaving}
-                className="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 mt-1"
-              >
-                {passwordSaving ? "Updating Password…" : "Update Password"}
-              </button>
-            </form>
-          )}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted-foreground">New Password</label>
+              <div className="relative">
+                <input
+                  type={showNewPass ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPass(!showNewPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPass ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted-foreground">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none bg-muted border border-border text-foreground transition-colors focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={passwordSaving}
+              className="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-[1.01] active:scale-95 shadow text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 mt-1"
+            >
+              {passwordSaving ? "Updating Password…" : "Update Password"}
+            </button>
+          </form>
         </div>
 
         {/* ─── LOG OUT SECTION ─── */}
         <div className="glow-card p-4 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-3 border-rose-500/20">
           <div>
             <p className="text-sm font-bold text-foreground">
-              {isGuest ? "Exit Guest Mode" : "Account Session"}
+              Account Session
             </p>
             <p className="text-xs text-muted-foreground">
-              {isGuest ? "Clear temporary guest session data" : "Sign out from this device"}
+              Sign out from this device
             </p>
           </div>
 
@@ -557,7 +500,7 @@ export function ProfilePage() {
             disabled={loggingOut}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all hover:scale-105 active:scale-95"
           >
-            {loggingOut ? "Signing out…" : isGuest ? "🚪 Exit Session" : "🚪 Log Out"}
+            {loggingOut ? "Signing out…" : "🚪 Log Out"}
           </button>
         </div>
       </main>

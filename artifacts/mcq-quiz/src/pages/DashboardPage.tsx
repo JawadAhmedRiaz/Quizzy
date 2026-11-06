@@ -36,7 +36,7 @@ function xpLevelInfo(xp: number) {
 export function DashboardPage() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, login } = useAuth();
-  const { effectiveUserId, displayName, profile, gamification, isGuest, saveProfile, refreshProfile } = useUser();
+  const { effectiveUserId, displayName, profile, gamification, saveProfile, refreshProfile } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Avatar state
@@ -194,7 +194,7 @@ export function DashboardPage() {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-black tracking-tight truncate" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                    {displayName || (isGuest ? "Guest Scholar" : user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "Student")}
+                    {displayName || (user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Student")}
                   </h1>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
                     {lvl.emoji} {lvl.level}
@@ -205,7 +205,7 @@ export function DashboardPage() {
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
                   <span className="flex items-center gap-1">
                     <span>📧</span>
-                    <span>{user?.email || (profile?.rollNumber ? `ID: ${profile.rollNumber}` : "guest@quizzy.study")}</span>
+                    <span>{user?.email || (profile?.rollNumber ? `ID: ${profile.rollNumber}` : "")}</span>
                   </span>
                   {profile?.department && (
                     <span className="flex items-center gap-1 text-slate-500">

@@ -59,7 +59,6 @@ export function LeaderboardPage() {
     const profile = profileMap[userName];
     if (profile?.displayName) return profile.displayName;
     if (userName === effectiveUserId) return myDisplayName;
-    if (userName.startsWith("guest_")) return "Guest";
     return userName.length > 18 ? userName.slice(0, 18) + "…" : userName;
   }
 
@@ -200,7 +199,7 @@ export function LeaderboardPage() {
               </div>
             ) : (
               <div className="flex flex-col">
-                {data.map((e, i) => {
+                {(data || []).filter(e => !e.userName.startsWith("guest_") && e.userName.toLowerCase() !== "guest").map((e, i) => {
                   const me = isMe(e.userName);
                   const name = resolveDisplayName(e.userName);
                   return (
@@ -255,9 +254,9 @@ export function LeaderboardPage() {
               </div>
             ) : (
               <div className="flex flex-col">
-                {xpBoard.map((e, i) => {
+                {xpBoard.filter(e => !e.userId.startsWith("guest_")).map((e, i) => {
                   const me = isMe(e.userId) || (e.displayName && e.displayName.toLowerCase().trim() === (myDisplayName || "").toLowerCase().trim());
-                  const name = e.displayName || (me ? myDisplayName : (e.userId.startsWith("guest_") ? "Guest" : e.userId.slice(0, 16)));
+                  const name = e.displayName || (me ? myDisplayName : e.userId.slice(0, 16));
                   return (
                     <motion.div key={e.userId} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4) }}
                       className="flex items-center gap-3 py-3 rounded-2xl px-3 transition-all"

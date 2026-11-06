@@ -48,7 +48,8 @@ router.get("/gamification/:userId", async (req, res): Promise<void> => {
 router.get("/gamification/leaderboard/xp", async (req, res): Promise<void> => {
   const rows = await db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, xp: profilesTable.xp })
     .from(profilesTable).orderBy(desc(profilesTable.xp)).limit(50);
-  res.json(rows.map((r, i) => ({ ...r, rank: i + 1, level: xpLevel(r.xp).level })));
+  const filtered = rows.filter((r) => !r.userId.startsWith("guest_"));
+  res.json(filtered.map((r, i) => ({ ...r, rank: i + 1, level: xpLevel(r.xp).level })));
 });
 
 router.get("/gamification/gender-compare", async (req, res): Promise<void> => {

@@ -72,7 +72,7 @@ async function getUserIdentities() {
   }
 
   function resolveToCanonical(rawName: string): string {
-    if (!rawName) return "Guest";
+    if (!rawName) return "";
     const trimmed = rawName.trim();
     if (nameMap.has(trimmed)) return nameMap.get(trimmed)!;
     const lower = trimmed.toLowerCase();
@@ -81,11 +81,11 @@ async function getUserIdentities() {
         return ident.canonicalName;
       }
     }
-    if (trimmed.startsWith("guest_") || trimmed.startsWith("Guest Student")) {
-      return "Guest";
+    if (trimmed.startsWith("guest_") || trimmed.startsWith("Guest Student") || lower === "guest" || lower === "guest scholar") {
+      return "";
     }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
-      return "Guest";
+      return "";
     }
     return trimmed;
   }
@@ -122,20 +122,20 @@ async function getUserIdentities() {
   return { identities, nameMap, resolveToCanonical, matchesUser };
 }
 
-// Clean any legacy UUIDs or "Guest Student (...)" strings in quizReportsTable
+// Clean any legacy UUIDs in quizReportsTable (do not touch or delete guest rows)
 async function cleanLegacyRecords() {
   try {
     const { nameMap, resolveToCanonical } = await getUserIdentities();
     const allReports = await db.select().from(quizReportsTable);
     for (const r of allReports) {
-      const isLegacy =
-        r.userName.startsWith("guest_") ||
-        r.userName.startsWith("Guest Student") ||
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.userName);
+      if (r.userName.startsWith("guest_") || r.userName.startsWith("Guest Student") || r.userName.toLowerCase() === "guest") {
+        continue;
+      }
+      const isLegacyUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.userName);
 
-      if (isLegacy || nameMap.has(r.userName)) {
+      if (isLegacyUuid || nameMap.has(r.userName)) {
         const clean = resolveToCanonical(r.userName);
-        if (clean !== r.userName) {
+        if (clean && clean !== r.userName && clean.toLowerCase() !== "guest") {
           await db
             .update(quizReportsTable)
             .set({ userName: clean })
@@ -283,8 +283,8 @@ router.get("/quiz-reports/leaderboard", async (req, res): Promise<void> => {
     .groupBy(quizReportsTable.userName)
     .orderBy(desc(max(quizReportsTable.score)));
 
-  res.json(
-    rows.map((r) => ({
+  const validRows = rows
+    .map((r) => ({
       userName: resolveToCanonical(r.userName),
       bestScore: r.bestScore ?? 0,
       bestPct: r.bestPct ?? 0,
@@ -292,7 +292,9 @@ router.get("/quiz-reports/leaderboard", async (req, res): Promise<void> => {
       total: r.total ?? 0,
       attempts: r.attempts,
     }))
-  );
+    .filter((r) => r.userName && !r.userName.startsWith("guest_") && r.userName.toLowerCase() !== "guest");
+
+  res.json(validRows);
 });
 
 router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
@@ -307,8 +309,9 @@ router.get("/quiz-reports/users", async (_req, res): Promise<void> => {
   const aggregated = new Map<string, { userName: string; attempts: number }>();
 
   for (const r of rows) {
+    if (r.userName.startsWith("guest_") || r.userName.toLowerCase() === "guest") continue;
     const clean = resolveToCanonical(r.userName);
-    if (clean === "Guest" && rows.length > 1) continue; // Don't show generic Guest if named students exist
+    if (!clean || clean === "Guest" || clean.startsWith("guest_")) continue;
     if (aggregated.has(clean)) {
       aggregated.get(clean)!.attempts += Number(r.attempts);
     } else {

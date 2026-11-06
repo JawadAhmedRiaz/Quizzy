@@ -561,7 +561,7 @@ router.get("/admin/audit/users", adminMiddleware, async (req, res): Promise<void
 
   const userIds = stats.map((s) => s.userId);
   const profiles = userIds.length > 0
-    ? await db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, rollNumber: profilesTable.rollNumber, isGuest: profilesTable.isGuest })
+    ? await db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, rollNumber: profilesTable.rollNumber })
         .from(profilesTable).where(inArray(profilesTable.userId, userIds))
     : [];
 
@@ -570,7 +570,6 @@ router.get("/admin/audit/users", adminMiddleware, async (req, res): Promise<void
     userId: s.userId,
     displayName: profileMap[s.userId]?.displayName ?? s.userId,
     rollNumber: profileMap[s.userId]?.rollNumber ?? null,
-    isGuest: profileMap[s.userId]?.isGuest ?? false,
     attempts: Number(s.attempts),
     lastAttempt: s.lastAttempt?.toISOString() ?? null,
     totalCorrect: Number(s.totalCorrect ?? 0),

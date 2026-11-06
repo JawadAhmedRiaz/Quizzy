@@ -12,7 +12,6 @@ export const profilesTable = pgTable("profiles", {
   streakLastDate: text("streak_last_date"),
   freezesAvailable: integer("freezes_available").notNull().default(0),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(false),
-  isGuest: boolean("is_guest").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -131,7 +131,6 @@ export async function authMiddleware(
                   xp: 0,
                   streakCount: 0,
                   streakLastDate: new Date().toISOString().slice(0, 10),
-                  isGuest: false,
                 })
                 .onConflictDoNothing();
             } catch {

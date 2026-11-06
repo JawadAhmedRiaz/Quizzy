@@ -10,7 +10,8 @@ router.get("/leaderboard", async (req, res): Promise<void> => {
     .select()
     .from(leaderboardTable)
     .orderBy(desc(leaderboardTable.score));
-  res.json(GetLeaderboardResponse.parse(entries.map((e) => ({
+  const filtered = entries.filter((e) => !e.name.toLowerCase().startsWith("guest") && !e.name.startsWith("guest_"));
+  res.json(GetLeaderboardResponse.parse(filtered.map((e) => ({
     ...e,
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),

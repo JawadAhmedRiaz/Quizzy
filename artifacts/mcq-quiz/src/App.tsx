@@ -77,10 +77,29 @@ function MaintenanceOverlay() {
 }
 
 function AppInner() {
-  const { effectiveUserId, displayName, profile, isGuest, refreshProfile } = useUser();
+  const { effectiveUserId, displayName, profile } = useUser();
   const { isAuthenticated, isLoading: authLoading, isAuthModalOpen, closeAuthModal } = useAuth();
 
-  const activeUserKey = !isGuest && effectiveUserId
+  // One-time browser cleanup of old guest localStorage keys on app start
+  useEffect(() => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("quizzy_guest_")) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      localStorage.removeItem("quizzy_guest_continued");
+      localStorage.removeItem("quizzy_guest_id");
+      localStorage.removeItem("quizzy_guest_firstname");
+      localStorage.removeItem("quizzy_guest_surname");
+      localStorage.removeItem("quizzy_guest_gender");
+    } catch {}
+  }, []);
+
+  const activeUserKey = effectiveUserId
     ? (profile?.displayName && profile.displayName !== "Guest" ? profile.displayName : null)
       || (displayName && displayName !== "Guest Scholar" && displayName !== "User" ? displayName : null)
       || effectiveUserId
@@ -99,29 +118,6 @@ function AppInner() {
     }
   }, [location]);
 
-  async function handleContinueAsGuest(firstName: string, surname: string, gender: string) {
-    const id = "guest_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("quizzy_guest_id", id);
-    localStorage.setItem("quizzy_guest_firstname", firstName);
-    localStorage.setItem("quizzy_guest_surname", surname);
-    localStorage.setItem("quizzy_guest_gender", gender);
-    localStorage.setItem("quizzy_guest_continued", "1");
-    localStorage.setItem("welcomeDismissed", "1");
-    setShowWelcome(false);
-    closeAuthModal();
-
-    try {
-      await fetch(`${API}/profile`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: id, displayName: `${firstName} ${surname}`, gender, isGuest: true }),
-      });
-    } catch {}
-
-    await refreshProfile();
-    window.dispatchEvent(new Event("quizzy_profile_updated"));
-  }
-
   // 1. Loading state while Clerk initializes
   if (authLoading) {
     return (
@@ -136,12 +132,11 @@ function AppInner() {
     );
   }
 
-  // 2. If signed out and no explicit guest mode active, render Login Page
-  const isAuthorized = isAuthenticated || isGuest;
-  if (!isAuthorized) {
+  // 2. If signed out, render Login Page and Welcome Modal
+  if (!isAuthenticated) {
     return (
       <>
-        <LoginPage onContinueAsGuest={handleContinueAsGuest} />
+        <LoginPage />
         <WelcomeModal
           show={showWelcome || isAuthModalOpen}
           onDismiss={() => {
@@ -152,13 +147,12 @@ function AppInner() {
             setShowWelcome(false);
             closeAuthModal();
           }}
-          onContinueAsGuest={handleContinueAsGuest}
         />
       </>
     );
   }
 
-  // 3. Authenticated or explicit guest session: render app
+  // 3. Authenticated session: render app
   return (
     <>
       <AnimatePresence>
@@ -219,7 +213,6 @@ function AppInner() {
             setShowWelcome(false);
             closeAuthModal();
           }}
-          onContinueAsGuest={handleContinueAsGuest}
         />
         <ProfileCompletionPrompt />
       </div>

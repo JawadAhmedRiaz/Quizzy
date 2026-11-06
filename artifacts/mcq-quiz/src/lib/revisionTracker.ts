@@ -212,8 +212,7 @@ export async function syncMistakesFromDatabase(userName?: string): Promise<Mista
     typeof window === "undefined" ||
     !userName ||
     !userName.trim() ||
-    userName.trim().toLowerCase() === "guest" ||
-    userName.trim().toLowerCase() === "guest scholar"
+    userName.trim().toLowerCase().startsWith("guest")
   ) {
     return getAllMistakes();
   }
