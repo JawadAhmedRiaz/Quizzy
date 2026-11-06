@@ -195,6 +195,7 @@ function AppInner() {
           <Route path="/quiz/:quizId/play"        component={QuizPage} />
           <Route path="/quiz/:quizId/result"      component={ResultPage} />
           <Route path="/quiz/:quizId/leaderboard" component={LeaderboardPage} />
+          <Route path="/leaderboard"              component={LeaderboardPage} />
           <Route path="/analytics"  component={AnalyticsPage} />
           <Route path="/profile"    component={ProfilePage} />
           <Route path="/vault"      component={VaultPage} />

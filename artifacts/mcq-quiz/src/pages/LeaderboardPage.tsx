@@ -11,9 +11,10 @@ interface XpEntry { userId: string; displayName: string | null; xp: number; rank
 interface ProfileMap { [userId: string]: { displayName: string | null; gender?: string | null } }
 
 export function LeaderboardPage() {
-  const { quizId } = useParams<{ quizId: string }>();
+  const params = useParams<{ quizId?: string }>();
+  const quizId = params?.quizId || "all";
   const [, navigate] = useLocation();
-  const meta = getQuizMeta(quizId!);
+  const meta = quizId !== "all" ? getQuizMeta(quizId) : undefined;
   const { effectiveUserId, displayName: myDisplayName } = useUser();
   const [tab, setTab] = useState<"quiz" | "xp">("quiz");
   const [xpBoard, setXpBoard] = useState<XpEntry[]>([]);

@@ -43,9 +43,11 @@ export function BottomNavbar() {
     location.startsWith("/break") ||
     location.startsWith("/profile") ||
     location.startsWith("/analytics") ||
-    location.startsWith("/flagged");
+    location.startsWith("/flagged") ||
+    location.startsWith("/leaderboard");
 
   const moreLinks = [
+    { path: "/leaderboard", label: "Leaderboard", icon: "🏆", desc: "Top quiz scores & XP ranks" },
     { path: "/comparison", label: "Comparison", icon: "⚖️", desc: "Compare stats with peers" },
     { path: "/break", label: "Break Room", icon: "☕", desc: "Breather exercises & games" },
     { path: "/profile", label: "My Profile", icon: "👤", desc: "Account & preferences" },

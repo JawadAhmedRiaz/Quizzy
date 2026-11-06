@@ -336,6 +336,22 @@ header.top-navbar,
   z-index: 1;
 }
 
+@media (max-width: 639.98px) {
+  .card-container .box,
+  .quiz-card-container .box {
+    min-height: 10rem;
+    padding: 1rem;
+  }
+}
+
+/* Touch active tap response for subject cards & exam cards */
+.card-container .box:active,
+.quiz-card-container .box:active,
+.glass-exam-card:active {
+  transform: scale(0.97) !important;
+  transition: transform 0.1s ease !important;
+}
+
 .card-container .box .title,
 .quiz-card-container .box .title {
   font-size: 1.85rem;

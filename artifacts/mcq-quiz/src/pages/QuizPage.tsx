@@ -398,7 +398,7 @@ export function QuizPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
       {/* Break Modal */}
       <AnimatePresence>
         {paused && (
@@ -406,7 +406,7 @@ export function QuizPage() {
             className="fixed inset-0 z-50 flex items-center justify-center px-4"
             style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-xs rounded-2xl p-8 text-center flex flex-col gap-4 shadow-xl"
+              className="w-full max-w-xs max-h-[85dvh] overflow-y-auto rounded-2xl p-6 sm:p-8 text-center flex flex-col gap-4 shadow-xl"
               style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
               <div className="text-5xl">🕐</div>
               <h2 className="text-2xl font-black">Break Time</h2>
@@ -450,7 +450,7 @@ export function QuizPage() {
             className="fixed inset-0 z-50 flex items-center justify-center px-4"
             style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
             <motion.div initial={{ scale: 0.92, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92 }}
-              className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3 shadow-xl"
+              className="w-full max-w-sm max-h-[85dvh] overflow-y-auto rounded-2xl p-5 flex flex-col gap-3 shadow-xl"
               style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
               <div className="flex items-center justify-between">
                 <p className="font-bold text-sm">🚩 Flag this question</p>
@@ -509,8 +509,8 @@ export function QuizPage() {
           <span className="text-xs flex-shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>Global</span>
         </div>
 
-        {/* Top bar */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Desktop Top bar (1 row, >=md) */}
+        <div className="hidden md:flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
               {meta?.subjectName} · Q {doneCount + 1}/{totalQ}
@@ -551,6 +551,60 @@ export function QuizPage() {
               ⏸
             </button>
             <span className="text-sm font-black" style={{ color: "#60a5fa" }}>
+              {answers.reduce((s, a) => s + a.pointsEarned, 0)} pts
+            </span>
+          </div>
+        </div>
+
+        {/* Mobile Top bar (2 rows, <md) */}
+        <div className="flex md:hidden flex-col gap-1.5">
+          {/* Row 1: Subject title truncated with ellipsis + Pause */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" style={{ color: "hsl(var(--foreground))" }}>
+                {meta?.subjectName}
+              </p>
+              {isReviewMode && (
+                <p className="text-[11px] font-semibold text-amber-500">
+                  👁 Review mode — answers locked
+                </p>
+              )}
+              {!isReviewMode && mode === "backlog" && (
+                <p className="text-[11px] font-semibold text-amber-500">
+                  ⏭ Reviewing {backlog.length - idx} skipped
+                </p>
+              )}
+            </div>
+            <button onClick={() => { isPausedRef.current = true; setPaused(true); setBreakMinutes(null); if (perQTimerRef.current) clearInterval(perQTimerRef.current); }}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.05] flex-shrink-0"
+              style={{ background: "rgba(99,102,241,0.12)", color: "#a78bfa", border: "1px solid rgba(99,102,241,0.2)" }}
+              title="Pause / Take a break">
+              ⏸ Pause
+            </button>
+          </div>
+
+          {/* Row 2: Question counter + 38px Timer ring + Points */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-xs font-black text-muted-foreground flex-shrink-0">
+              Q {doneCount + 1}/{totalQ}
+            </span>
+
+            {/* Per-question timer (compact ~38px on mobile) */}
+            {!isReviewMode && (
+              <div className="relative flex items-center justify-center flex-shrink-0">
+                <svg width="38" height="38" className={timeLeft <= 5 ? "timer-danger" : ""}>
+                  <circle cx="19" cy="19" r="16" fill="none" stroke="hsl(var(--muted))" strokeWidth="2.5" />
+                  <circle cx="19" cy="19" r="16" fill="none" stroke={timerColor} strokeWidth="2.5" strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 16}`}
+                    strokeDashoffset={`${2 * Math.PI * 16 * (1 - timerPct / 100)}`}
+                    transform="rotate(-90 19 19)"
+                    style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s" }} />
+                </svg>
+                <span className="absolute text-[11px] font-bold" style={{ color: timerColor }}>{timeLeft}s</span>
+              </div>
+            )}
+
+            <span className="text-xs font-black text-blue-500 flex-shrink-0">
               {answers.reduce((s, a) => s + a.pointsEarned, 0)} pts
             </span>
           </div>
@@ -605,7 +659,7 @@ export function QuizPage() {
                     <button key={`${displayQ.q.slice(0, 8)}-${pos}`}
                       onClick={() => !displayAnswered && !isReviewMode ? handleAnswer(i) : undefined}
                       disabled={displayAnswered || isReviewMode}
-                      className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all leading-relaxed"
+                      className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all leading-relaxed min-h-[48px] flex items-center"
                       style={{ ...style, cursor: displayAnswered || isReviewMode ? "default" : "pointer" }}
                       onMouseEnter={(e) => { if (!displayAnswered && !isReviewMode) { e.currentTarget.style.background = "hsl(var(--secondary))"; e.currentTarget.style.borderColor = "#6366f1"; } }}
                       onMouseLeave={(e) => { if (!displayAnswered && !isReviewMode) { e.currentTarget.style.background = "hsl(var(--muted))"; e.currentTarget.style.borderColor = "hsl(var(--border))"; } }}>
@@ -715,34 +769,37 @@ export function QuizPage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Action buttons */}
-        <div className="flex justify-between items-center gap-2">
-          <button onClick={handleBack} disabled={!canGoBack}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{
-              background: canGoBack ? "rgba(251,191,36,0.12)" : "hsl(var(--muted))",
-              color: canGoBack ? "#fbbf24" : "hsl(var(--muted-foreground))",
-              border: `1px solid ${canGoBack ? "rgba(251,191,36,0.3)" : "hsl(var(--border))"}`,
-              opacity: canGoBack ? 1 : 0.4, cursor: canGoBack ? "pointer" : "not-allowed",
-            }}>
-            ↩ Back
-          </button>
+        {/* Action buttons (Sticky bottom bar on mobile, static on desktop) */}
+        <div className="fixed md:static bottom-0 left-0 right-0 z-30 bg-[#FAF7F2]/95 dark:bg-[#090D16]/95 backdrop-blur-md md:bg-transparent md:dark:bg-transparent border-t border-[#E6DFD3] dark:border-white/10 md:border-t-0 p-3 md:p-0 md:mt-2 shadow-lg md:shadow-none">
+          <div className="max-w-xl mx-auto flex justify-between items-center gap-2"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+            <button onClick={handleBack} disabled={!canGoBack}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+              style={{
+                background: canGoBack ? "rgba(251,191,36,0.12)" : "hsl(var(--muted))",
+                color: canGoBack ? "#fbbf24" : "hsl(var(--muted-foreground))",
+                border: `1px solid ${canGoBack ? "rgba(251,191,36,0.3)" : "hsl(var(--border))"}`,
+                opacity: canGoBack ? 1 : 0.4, cursor: canGoBack ? "pointer" : "not-allowed",
+              }}>
+              ↩ Back
+            </button>
 
-          <div className="flex gap-2">
-            {!displayAnswered && !isReviewMode && (
-              <button onClick={doSkip}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
-                Skip ⏭
-              </button>
-            )}
-            {(displayAnswered || isReviewMode) && (
-              <button onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
-                style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}>
-                {isReviewMode && reviewOffset > 1 ? "← Newer" : isReviewMode ? "Resume Quiz →" : isLastQuestion ? "See Results 🏆" : "Next →"}
-              </button>
-            )}
+            <div className="flex gap-2">
+              {!displayAnswered && !isReviewMode && (
+                <button onClick={doSkip}
+                  className="px-5 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+                  style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
+                  Skip ⏭
+                </button>
+              )}
+              {(displayAnswered || isReviewMode) && (
+                <button onClick={handleNext}
+                  className="px-6 py-2.5 min-h-[44px] rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
+                  style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}>
+                  {isReviewMode && reviewOffset > 1 ? "← Newer" : isReviewMode ? "Resume Quiz →" : isLastQuestion ? "See Results 🏆" : "Next →"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

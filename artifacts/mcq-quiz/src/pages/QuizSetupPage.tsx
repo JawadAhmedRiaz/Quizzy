@@ -137,7 +137,7 @@ export function QuizSetupPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 flex flex-col gap-4">
+      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-8 flex flex-col gap-4">
         <button onClick={() => navigate("/")}
           className="self-start flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80"
           style={{ color: "hsl(var(--muted-foreground))" }}>← Back to Home</button>
@@ -169,7 +169,7 @@ export function QuizSetupPage() {
               <button
                 type="button"
                 onClick={() => setPoolMode("remaining")}
-                className={`py-3 px-3 rounded-xl text-left transition-all ${
+                className={`py-3 px-3 rounded-xl text-left transition-all min-h-[48px] active:scale-[0.98] ${
                   poolMode === "remaining"
                     ? "bg-blue-600 text-white shadow-md"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -184,7 +184,7 @@ export function QuizSetupPage() {
               <button
                 type="button"
                 onClick={() => setPoolMode("all")}
-                className={`py-3 px-3 rounded-xl text-left transition-all ${
+                className={`py-3 px-3 rounded-xl text-left transition-all min-h-[48px] active:scale-[0.98] ${
                   poolMode === "all"
                     ? "bg-blue-600 text-white shadow-md"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -208,7 +208,7 @@ export function QuizSetupPage() {
             {presets.map(({ n, label, sub }) => (
               <button key={n}
                 onClick={() => { setTotalToAttempt(n); setUseCustom(false); }}
-                className="py-3 px-3 rounded-xl text-left transition-all hover:scale-[1.01]"
+                className="py-3 px-3 rounded-xl text-left transition-all min-h-[50px] active:scale-[0.98]"
                 style={{
                   background: !useCustom && totalToAttempt === n ? "linear-gradient(135deg, #3b82f6, #6366f1)" : "hsl(var(--muted))",
                   color: !useCustom && totalToAttempt === n ? "#fff" : "hsl(var(--muted-foreground))",
@@ -227,7 +227,7 @@ export function QuizSetupPage() {
               onFocus={() => setUseCustom(true)}
               onChange={(e) => { setCustomCount(e.target.value); setUseCustom(true); }}
               placeholder={`Custom (1–${questions.length})`}
-              className="flex-1 px-3 py-2.5 rounded-lg text-base md:text-sm outline-none"
+              className="flex-1 px-3 py-2.5 rounded-lg text-base md:text-sm outline-none min-h-[44px]"
               style={{
                 background: "hsl(var(--muted))",
                 border: `1px solid ${useCustom ? "#6366f1" : "hsl(var(--border))"}`,
@@ -251,7 +251,7 @@ export function QuizSetupPage() {
             {DIFFICULTIES.map(({ id, label, time, sub }) => (
               <button key={id}
                 onClick={() => setDifficulty(id)}
-                className="py-3 px-2 rounded-xl text-center transition-all hover:scale-[1.01]"
+                className="py-3 px-2 rounded-xl text-center transition-all min-h-[52px] flex flex-col justify-center items-center active:scale-[0.98]"
                 style={{
                   background: difficulty === id ? "linear-gradient(135deg, #3b82f6, #6366f1)" : "hsl(var(--muted))",
                   color: difficulty === id ? "#fff" : "hsl(var(--muted-foreground))",
@@ -284,7 +284,7 @@ export function QuizSetupPage() {
           style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "#fff", boxShadow: "0 8px 32px rgba(59,130,246,0.4)" }}>
           Start Quiz ({finalCount} MCQs) →
         </button>
-      </div>
+      </main>
 
       <AnimatePresence>
         {isLaunching && meta && (

@@ -177,46 +177,46 @@ export function DashboardPage() {
 
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
             {/* Left Column: Avatar + Identity */}
-            <div className="flex items-center gap-5 sm:gap-6 min-w-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 min-w-0 w-full lg:w-auto">
               {/* Interactive Animated Avatar */}
               <div className="flex-shrink-0">
                 <AnimatedAvatar
                   avatarId={avatarId}
-                  size={88}
+                  size={76}
                   interactive={true}
                   onSelectAvatar={handleAvatarChange}
                 />
               </div>
 
               {/* User Metadata */}
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight truncate" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              <div className="flex flex-col min-w-0 w-full">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight truncate max-w-full" style={{ fontFamily: "'Poppins', sans-serif" }}>
                     {displayName || (user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Student")}
                   </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
                     {lvl.emoji} {lvl.level}
                   </span>
                 </div>
 
                 {/* Email / Roll Number */}
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
-                  <span className="flex items-center gap-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
+                  <span className="flex items-center gap-1 truncate max-w-full">
                     <span>📧</span>
-                    <span>{user?.email || (profile?.rollNumber ? `ID: ${profile.rollNumber}` : "")}</span>
+                    <span className="truncate">{user?.email || (profile?.rollNumber ? `ID: ${profile.rollNumber}` : "")}</span>
                   </span>
                   {profile?.department && (
-                    <span className="flex items-center gap-1 text-slate-500">
+                    <span className="flex items-center gap-1 text-slate-500 shrink-0">
                       <span>•</span>
                       <span>{profile.department}</span>
                     </span>
                   )}
                 </div>
 
-                {/* Semester Badge (read-only, configured in profile) */}
-                <div className="flex items-center gap-2 mt-3">
+                {/* Semester Badge + Daily Streak */}
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                   <div
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm select-none"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold shadow-sm select-none"
                     style={{
                       background: "rgba(0, 122, 255, 0.12)",
                       border: "1px solid rgba(0, 122, 255, 0.3)",
@@ -225,12 +225,12 @@ export function DashboardPage() {
                     title="Configured in your Profile"
                   >
                     <span>🎓</span>
-                    <span>Semester {profile?.semester ?? selectedSemester ?? 1}</span>
+                    <span>Sem {profile?.semester ?? selectedSemester ?? 1}</span>
                   </div>
 
                   {/* Daily Streak */}
                   <div
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold"
                     style={{
                       background: "rgba(245, 158, 11, 0.12)",
                       border: "1px solid rgba(245, 158, 11, 0.3)",
@@ -238,12 +238,12 @@ export function DashboardPage() {
                     }}
                   >
                     <span>🔥</span>
-                    <span>{streak} Day Streak</span>
+                    <span>{streak}d Streak</span>
                   </div>
                 </div>
 
                 {/* Level Progress Bar */}
-                <div className="w-full max-w-xs mt-3.5">
+                <div className="w-full max-w-xs mt-3">
                   <div className="flex justify-between items-center text-[11px] font-bold text-muted-foreground mb-1">
                     <span>XP Progress</span>
                     <span>
@@ -264,37 +264,37 @@ export function DashboardPage() {
             </div>
 
             {/* Right Column: Quick Stat Counter Pills */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 w-full lg:w-auto flex-shrink-0">
-              <div className="p-3.5 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Accuracy</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2 sm:gap-3 w-full lg:w-auto flex-shrink-0">
+              <div className="p-3 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider truncate">Accuracy</span>
                 <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                   {overallAccuracy}%
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Quiz Mastery</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 truncate">Quiz Mastery</span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Quizzes</span>
+              <div className="p-3 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider truncate">Quizzes</span>
                 <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">
                   {totalQuizzesCount}
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Completed</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 truncate">Completed</span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Study Time</span>
+              <div className="p-3 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider truncate">Study Time</span>
                 <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
                   {totalStudyHours}h
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">{avgDailyMins}m / day avg</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 truncate">{avgDailyMins}m / day</span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Badges</span>
+              <div className="p-3 rounded-2xl bg-card/60 border border-border/80 flex flex-col justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider truncate">Badges</span>
                 <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
                   {earnedBadgeIds.size} / {allBadges.length}
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Achievements</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 truncate">Achievements</span>
               </div>
             </div>
           </div>

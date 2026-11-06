@@ -166,7 +166,7 @@ export function ResultPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 w-full max-w-xl mx-auto px-4 py-6 flex flex-col gap-4">
+      <main className="flex-1 w-full max-w-xl mx-auto px-4 py-6 flex flex-col gap-4">
         {/* Score card */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glow-card p-6 text-center">
           <div className="text-5xl mb-2">{emoji}</div>
@@ -234,22 +234,29 @@ export function ResultPage() {
         {topics.length > 0 && (
           <div className="glow-card p-4 flex flex-col gap-3">
             <p className="text-sm font-black">📊 Topic Performance</p>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {topics.map((t) => (
-                <div key={t.name} className="flex items-center gap-2">
-                  <span className="text-xs w-5 flex-shrink-0">{t.pct >= 60 ? "💪" : "📚"}</span>
-                  <span className="text-xs font-medium flex-1 truncate">{t.name}</span>
-                  <div className="w-24 h-2 rounded-full flex-shrink-0" style={{ background: "hsl(var(--muted))" }}>
-                    <motion.div className="h-full rounded-full"
-                      style={{ background: t.pct >= 75 ? "#22c55e" : t.pct >= 50 ? "#f59e0b" : "#ef4444" }}
-                      initial={{ width: 0 }} animate={{ width: `${t.pct}%` }} transition={{ duration: 0.8, delay: 0.1 }} />
+                <div key={t.name} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-xl bg-muted/30 sm:bg-transparent">
+                  {/* Topic Name gets full width on small screens */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-xs w-5 flex-shrink-0">{t.pct >= 60 ? "💪" : "📚"}</span>
+                    <span className="text-xs font-semibold text-foreground truncate">{t.name}</span>
                   </div>
-                  <span className="text-xs font-bold w-12 text-right flex-shrink-0" style={{ color: t.pct >= 60 ? "#34d399" : "#f87171" }}>
-                    {t.correct}/{t.total}
-                  </span>
-                  <span className="text-xs font-black w-10 text-right flex-shrink-0" style={{ color: t.pct >= 60 ? "#34d399" : "#f87171" }}>
-                    {t.pct}%
-                  </span>
+
+                  {/* Progress bar and score badges */}
+                  <div className="flex items-center gap-2.5 pl-7 sm:pl-0 flex-shrink-0">
+                    <div className="w-24 sm:w-24 h-2 rounded-full flex-shrink-0" style={{ background: "hsl(var(--muted))" }}>
+                      <motion.div className="h-full rounded-full"
+                        style={{ background: t.pct >= 75 ? "#22c55e" : t.pct >= 50 ? "#f59e0b" : "#ef4444" }}
+                        initial={{ width: 0 }} animate={{ width: `${t.pct}%` }} transition={{ duration: 0.8, delay: 0.1 }} />
+                    </div>
+                    <span className="text-xs font-bold w-10 text-right flex-shrink-0" style={{ color: t.pct >= 60 ? "#34d399" : "#f87171" }}>
+                      {t.correct}/{t.total}
+                    </span>
+                    <span className="text-xs font-black w-10 text-right flex-shrink-0" style={{ color: t.pct >= 60 ? "#34d399" : "#f87171" }}>
+                      {t.pct}%
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -366,7 +373,7 @@ export function ResultPage() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </main>
     </div>
   );
 }

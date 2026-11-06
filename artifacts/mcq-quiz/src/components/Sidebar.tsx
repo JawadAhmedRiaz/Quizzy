@@ -153,6 +153,7 @@ export function Sidebar({ open, onClose }: Props) {
                     { path: "/study", label: "📚 Study" },
                     { path: "/revision", label: "🎯 Revision Hub" },
                     { path: "/vault", label: "🏛️ Vault" },
+                    { path: "/leaderboard", label: "🏆 Leaderboard" },
                     { path: "/comparison", label: "⚖️ Comparison" },
                     { path: "/break", label: "☕ Break" },
                     { path: "/analytics?tab=mine", label: "📈 Detailed Analytics" },
