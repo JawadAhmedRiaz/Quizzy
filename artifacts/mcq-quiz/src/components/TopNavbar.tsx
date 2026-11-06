@@ -203,7 +203,7 @@ export function TopNavbar(_props: Props = {}) {
         {gamification?.xp !== undefined && (
           <Link
             href="/dashboard"
-            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all hover:scale-[1.03]"
+            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all hover:scale-[1.03] shrink-0"
             style={{
               background: "rgba(245, 158, 11, 0.14)",
               border: "1px solid rgba(245, 158, 11, 0.32)",
@@ -218,6 +218,27 @@ export function TopNavbar(_props: Props = {}) {
             </span>
           </Link>
         )}
+
+        {/* Flagged Questions Quick Access */}
+        <Link
+          href="/flagged"
+          className="relative flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
+          aria-label="Flagged Questions"
+          title="Flagged Questions"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+            <line x1="4" x2="4" y1="22" y2="15" />
+          </svg>
+        </Link>
 
         {/* Day/Night Theme Toggle */}
         <ThemeToggle />
