@@ -20,7 +20,6 @@ import { QuizSetupPage } from "@/pages/QuizSetupPage";
 import { QuizPage } from "@/pages/QuizPage";
 import { ResultPage } from "@/pages/ResultPage";
 import { LeaderboardPage } from "@/pages/LeaderboardPage";
-import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { VaultPage } from "@/pages/VaultPage";
@@ -196,7 +195,6 @@ function AppInner() {
           <Route path="/quiz/:quizId/result"      component={ResultPage} />
           <Route path="/quiz/:quizId/leaderboard" component={LeaderboardPage} />
           <Route path="/leaderboard"              component={LeaderboardPage} />
-          <Route path="/analytics"  component={AnalyticsPage} />
           <Route path="/profile"    component={ProfilePage} />
           <Route path="/vault"      component={VaultPage} />
           <Route path="/revision"   component={RevisionPage} />

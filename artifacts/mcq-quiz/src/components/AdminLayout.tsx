@@ -73,7 +73,6 @@ export function AdminLayout({ children }: Props) {
     if (path.startsWith("/profile")) return "Profile";
     if (path.startsWith("/comparison")) return "Comparison";
     if (path.startsWith("/flagged")) return "Flagged";
-    if (path.startsWith("/analytics")) return "Analytics";
     return "App";
   };
 

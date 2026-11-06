@@ -42,7 +42,6 @@ export function BottomNavbar() {
     location.startsWith("/comparison") ||
     location.startsWith("/break") ||
     location.startsWith("/profile") ||
-    location.startsWith("/analytics") ||
     location.startsWith("/flagged") ||
     location.startsWith("/leaderboard");
 
@@ -51,7 +50,6 @@ export function BottomNavbar() {
     { path: "/comparison", label: "Comparison", icon: "⚖️", desc: "Compare stats with peers" },
     { path: "/break", label: "Break Room", icon: "☕", desc: "Breather exercises & games" },
     { path: "/profile", label: "My Profile", icon: "👤", desc: "Account & preferences" },
-    { path: "/analytics?tab=mine", label: "Analytics", icon: "📈", desc: "Detailed performance" },
     { path: "/flagged", label: "Flagged Questions", icon: "🚩", desc: "Your flagged items" },
     ...(isAdmin ? [{ path: "/admin/site-settings", label: "Admin Portal", icon: "⚙️", desc: "App management" }] : []),
   ];

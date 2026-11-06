@@ -156,7 +156,6 @@ export function Sidebar({ open, onClose }: Props) {
                     { path: "/leaderboard", label: "🏆 Leaderboard" },
                     { path: "/comparison", label: "⚖️ Comparison" },
                     { path: "/break", label: "☕ Break" },
-                    { path: "/analytics?tab=mine", label: "📈 Detailed Analytics" },
                     ...(isAdmin ? [{ path: "/admin/import", label: "⚙️ Admin Dashboard" }] : []),
                   ].map(({ path, label }) => (
                     <button key={path} onClick={() => goTo(path)}
