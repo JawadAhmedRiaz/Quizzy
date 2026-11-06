@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { eq, desc, and, sql } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
-import { db, vaultItemsTable, systemConfigsTable, usersTable } from "@workspace/db";
+import { db, vaultItemsTable, subjectsTable, systemConfigsTable, usersTable } from "@workspace/db";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import {
   uploadVaultFile,
@@ -465,7 +465,216 @@ router.post(
   }
 );
 
-// 5. Delete a vault item (Admin only)
+// 5. Update an existing vault item (Admin only)
+// Accepts multipart/form-data or application/json. If a replacement file is provided:
+// 1. Upload new file to Supabase bucket.
+// 2. Update DB row.
+// 3. Delete old file from bucket.
+// 4. If DB update fails, rollback the new file from storage immediately.
+router.put(
+  "/vault/:id",
+  adminMiddleware,
+  handleVaultUploadMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(rawId, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid item ID" });
+      return;
+    }
+
+    try {
+      // 1. Verify existence of item
+      const [existing] = await db
+        .select({
+          id: vaultItemsTable.id,
+          userId: vaultItemsTable.userId,
+          subjectId: vaultItemsTable.subjectId,
+          title: vaultItemsTable.title,
+          category: vaultItemsTable.category,
+          description: vaultItemsTable.description,
+          tags: vaultItemsTable.tags,
+          storagePath: vaultItemsTable.storagePath,
+          fileUrl: vaultItemsTable.fileUrl,
+          fileName: vaultItemsTable.fileName,
+          fileSize: vaultItemsTable.fileSize,
+          mimeType: vaultItemsTable.mimeType,
+          createdAt: vaultItemsTable.createdAt,
+          updatedAt: vaultItemsTable.updatedAt,
+        })
+        .from(vaultItemsTable)
+        .where(eq(vaultItemsTable.id, id))
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Vault item not found" });
+        return;
+      }
+
+      // 2. Validate body fields
+      const title = req.body.title !== undefined ? String(req.body.title).trim() : undefined;
+      const subjectIdRaw = req.body.subjectId !== undefined ? req.body.subjectId : undefined;
+      const category = req.body.category !== undefined ? String(req.body.category).trim() : undefined;
+      const description = req.body.description !== undefined ? String(req.body.description).trim() : undefined;
+      const tags = req.body.tags;
+
+      if (title !== undefined) {
+        if (title.length < 1 || title.length > 200) {
+          res.status(400).json({ error: "Title must be between 1 and 200 characters." });
+          return;
+        }
+      }
+
+      const ALLOWED_CATEGORIES = new Set(["pdf", "handwritten", "notes", "summary", "other"]);
+      if (category !== undefined && !ALLOWED_CATEGORIES.has(category)) {
+        res.status(400).json({ error: `Invalid category '${category}'. Allowed: pdf, handwritten, notes, summary, other.` });
+        return;
+      }
+
+      let subjectId: number | undefined;
+      if (subjectIdRaw !== undefined && subjectIdRaw !== "") {
+        subjectId = parseInt(String(subjectIdRaw), 10);
+        if (isNaN(subjectId) || subjectId <= 0) {
+          res.status(400).json({ error: "Invalid subjectId." });
+          return;
+        }
+        const [subj] = await db
+          .select({ id: subjectsTable.id })
+          .from(subjectsTable)
+          .where(eq(subjectsTable.id, subjectId))
+          .limit(1);
+        if (!subj) {
+          res.status(400).json({ error: `Subject ID ${subjectId} does not exist.` });
+          return;
+        }
+      }
+
+      const updates: Partial<typeof vaultItemsTable.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (title !== undefined) updates.title = title;
+      if (subjectId !== undefined) updates.subjectId = subjectId;
+      if (category !== undefined) updates.category = category as any;
+      if (description !== undefined) updates.description = description || null;
+      if (tags !== undefined) {
+        let parsedTags: string[] = [];
+        try {
+          parsedTags = typeof tags === "string" ? JSON.parse(tags) : Array.isArray(tags) ? tags : [];
+        } catch {
+          parsedTags = typeof tags === "string" ? [tags] : [];
+        }
+        updates.tags = JSON.stringify(parsedTags);
+      }
+
+      let newStoragePath: string | null = null;
+      let oldStoragePathToDelete: string | null = null;
+
+      // 3. If replacement file was provided, upload to bucket first
+      if (req.file) {
+        const originalName = req.file.originalname || "document.pdf";
+        const sanitizedName = sanitizeFileName(originalName);
+        const mimeType = req.file.mimetype || "application/octet-stream";
+        const fileSize = formatFileSize(req.file.size);
+
+        try {
+          newStoragePath = await uploadVaultFile(req.file.buffer, originalName, mimeType);
+        } catch (err: any) {
+          req.log?.error?.({ err }, "Error uploading replacement vault file");
+          res.status(500).json({ error: err.message || "Failed to upload replacement file." });
+          return;
+        }
+
+        updates.storagePath = newStoragePath;
+        updates.fileUrl = null; // Clear legacy Base64 if any
+        updates.fileName = sanitizedName;
+        updates.fileSize = fileSize;
+        updates.mimeType = mimeType;
+
+        if (existing.storagePath) {
+          oldStoragePathToDelete = existing.storagePath;
+        }
+      }
+
+      // 4. Update database row with rollback protection
+      let updatedItem: typeof existing;
+      try {
+        const [row] = await db
+          .update(vaultItemsTable)
+          .set(updates)
+          .where(eq(vaultItemsTable.id, id))
+          .returning();
+        updatedItem = row;
+      } catch (dbErr: any) {
+        // Rollback: delete new file immediately so storage is not orphaned
+        if (newStoragePath) {
+          try {
+            await deleteVaultFile(newStoragePath);
+          } catch (delErr: any) {
+            req.log?.error?.({ delErr, newStoragePath }, "Failed to rollback orphaned storage file");
+          }
+        }
+        const underlying = dbErr?.cause || {};
+        req.log?.error?.(
+          {
+            errMessage: dbErr?.message,
+            pgCode: underlying?.code,
+            pgMessage: underlying?.message,
+          },
+          "Error updating vault item in database"
+        );
+        res.status(500).json({ error: "Failed to update vault item." });
+        return;
+      }
+
+      // 5. On successful DB update, clean up old storage object
+      if (oldStoragePathToDelete) {
+        try {
+          await deleteVaultFile(oldStoragePathToDelete);
+        } catch (delErr: any) {
+          req.log?.error?.({ delErr, oldStoragePathToDelete }, "Failed to delete old storage file after replacement");
+        }
+      }
+
+      let parsedTags: string[] = [];
+      if (updatedItem.tags) {
+        try {
+          parsedTags = typeof updatedItem.tags === "string" ? JSON.parse(updatedItem.tags) : updatedItem.tags;
+        } catch {
+          parsedTags = [];
+        }
+      }
+
+      res.json({
+        id: updatedItem.id,
+        userId: updatedItem.userId,
+        subjectId: updatedItem.subjectId,
+        title: updatedItem.title,
+        category: updatedItem.category,
+        description: updatedItem.description,
+        tags: parsedTags,
+        fileName: updatedItem.fileName,
+        fileSize: updatedItem.fileSize,
+        mimeType: updatedItem.mimeType,
+        createdAt: updatedItem.createdAt.toISOString(),
+        updatedAt: updatedItem.updatedAt.toISOString(),
+        isLegacy: false,
+      });
+    } catch (err: any) {
+      const underlying = err?.cause || {};
+      req.log?.error?.(
+        {
+          errMessage: err?.message,
+          pgCode: underlying?.code,
+          pgMessage: underlying?.message,
+        },
+        "Unexpected error in PUT /vault/:id"
+      );
+      res.status(500).json({ error: "Failed to update vault item." });
+    }
+  }
+);
+
+// 6. Delete a vault item (Admin only)
 router.delete("/vault/:id", adminMiddleware, async (req: Request, res: Response): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);

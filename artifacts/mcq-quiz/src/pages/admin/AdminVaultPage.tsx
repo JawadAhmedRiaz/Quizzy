@@ -253,6 +253,118 @@ export function AdminVaultPage() {
   }, [isFullscreen, previewDoc]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Edit Document Modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<VaultDoc | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSubjectId, setEditSubjectId] = useState<number | "">("");
+  const [editCategory, setEditCategory] = useState<VaultDoc["category"]>("pdf");
+  const [editDescription, setEditDescription] = useState("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [replaceFile, setReplaceFile] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleOpenEdit = (doc: VaultDoc, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingItem(doc);
+    setEditTitle(doc.title);
+    setEditSubjectId(doc.subjectId);
+    setEditCategory(doc.category);
+    setEditDescription(doc.description || "");
+    setEditFile(null);
+    setReplaceFile(false);
+    setEditError("");
+    setEditModalOpen(true);
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditError("");
+    const file = e.target.files?.[0];
+    if (!file) {
+      setEditFile(null);
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!ALLOWED_VAULT_EXTS.has(ext)) {
+      setEditError(`Invalid file extension ".${ext}". Allowed: PDF, PPT, PPTX, DOC, DOCX, PNG, JPG, JPEG.`);
+      setEditFile(null);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+
+    if (file.size > MAX_VAULT_FILE_SIZE) {
+      setEditError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 50 MB.`);
+      setEditFile(null);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+
+    setEditFile(file);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    setEditError("");
+
+    if (!editTitle.trim()) {
+      setEditError("Please provide a title for the document.");
+      return;
+    }
+    if (!editSubjectId) {
+      setEditError("Please select a subject.");
+      return;
+    }
+    if (replaceFile && !editFile) {
+      setEditError("Please select a replacement file or uncheck 'Replace file'.");
+      return;
+    }
+
+    setSavingEdit(true);
+
+    const formData = new FormData();
+    formData.append("title", editTitle.trim());
+    formData.append("subjectId", String(editSubjectId));
+    formData.append("category", editCategory);
+    if (editDescription.trim()) {
+      formData.append("description", editDescription.trim());
+    }
+    if (replaceFile && editFile) {
+      formData.append("file", editFile);
+    }
+
+    try {
+      const res = await fetch(`${API}/vault/${editingItem.id}`, {
+        method: "PUT",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const updated: VaultDoc = await res.json();
+        setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        if (previewDoc?.id === updated.id) {
+          setPreviewDoc(updated);
+        }
+        setEditModalOpen(false);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 413) {
+          setEditError(errData.error || "File size exceeds the 50 MB server limit.");
+        } else {
+          setEditError(errData.error || `Update failed (Status ${res.status}).`);
+        }
+      }
+    } catch {
+      setEditError("Network error while updating document.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // Add Semester Modal
   const [addSemModalOpen, setAddSemModalOpen] = useState(false);
   const [newSemNum, setNewSemNum] = useState<number | "">("");
@@ -912,6 +1024,15 @@ export function AdminVaultPage() {
 
                       <button
                         type="button"
+                        onClick={(e) => handleOpenEdit(item, e)}
+                        className="px-2 py-1 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 font-semibold"
+                        title="Edit Document"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={(e) => handleDirectDownload(item, e)}
                         disabled={downloadingId === item.id}
                         className="px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 font-semibold disabled:opacity-50"
@@ -1064,6 +1185,166 @@ export function AdminVaultPage() {
                     className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
                   >
                     {uploading ? "Publishing to Vault…" : "Publish Material"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ─── EDIT MODAL ─── */}
+        {editModalOpen && editingItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl relative">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">✏️</span>
+                  <h3 className="text-base font-bold text-white">Edit Study Document</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3.5 mt-4">
+                {editError && (
+                  <div className="p-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-300">
+                    {editError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Document Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    maxLength={200}
+                    required
+                    className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">Subject</label>
+                    <select
+                      value={editSubjectId}
+                      onChange={(e) => setEditSubjectId(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
+                    >
+                      {subjects.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} (Sem {s.sem})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">Category</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500"
+                    >
+                      <option value="pdf">📑 PDF / Slides</option>
+                      <option value="handwritten">✍️ Handwritten Notes</option>
+                      <option value="notes">📝 Lecture Notes</option>
+                      <option value="summary">⚡ Exam Summary</option>
+                      <option value="other">📂 Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Description / Notes</label>
+                  <textarea
+                    rows={2}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-slate-800 border border-slate-700 text-white focus:border-indigo-500 resize-none"
+                  />
+                </div>
+
+                {/* File Replacement Section */}
+                <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-200">Current File</p>
+                      <p className="text-[11px] text-slate-400 truncate max-w-[280px]">
+                        {editingItem.fileName} ({editingItem.fileSize || "Stored"})
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-400">
+                      <input
+                        type="checkbox"
+                        checked={replaceFile}
+                        onChange={(e) => {
+                          setReplaceFile(e.target.checked);
+                          if (!e.target.checked) {
+                            setEditFile(null);
+                            if (editFileInputRef.current) editFileInputRef.current.value = "";
+                          }
+                        }}
+                        className="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-0"
+                      />
+                      <span>Replace file</span>
+                    </label>
+                  </div>
+
+                  {replaceFile && (
+                    <div className="pt-2 border-t border-slate-700/60 flex flex-col gap-2">
+                      <input
+                        ref={editFileInputRef}
+                        type="file"
+                        onChange={handleEditFileChange}
+                        accept=".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => editFileInputRef.current?.click()}
+                        className="w-full py-2.5 px-3 rounded-xl border border-dashed border-indigo-500/50 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs text-indigo-300 font-semibold flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <span>📁</span>
+                        <span>{editFile ? editFile.name : "Select Replacement File (Max 50 MB)"}</span>
+                      </button>
+                      {editFile && (
+                        <p className="text-[10px] text-emerald-400 text-center font-bold">
+                          ✓ Ready to upload: {editFile.name} ({(editFile.size / (1024 * 1024)).toFixed(2)} MB)
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditModalOpen(false)}
+                    disabled={savingEdit}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {savingEdit ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Saving Changes…</span>
+                      </>
+                    ) : (
+                      <span>Save Changes</span>
+                    )}
                   </button>
                 </div>
               </form>
