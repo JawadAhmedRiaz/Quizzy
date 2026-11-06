@@ -15,6 +15,7 @@ export * from "./errorEnvelope";
 export * from "./examTypeStat";
 export * from "./getQuizLeaderboardParams";
 export * from "./getUserAnalyticsParams";
+export * from "./getVaultFileUrlParams";
 export * from "./getVaultItemsParams";
 export * from "./handleBrowserLoginCallbackParams";
 export * from "./healthStatus";

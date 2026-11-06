@@ -334,6 +334,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: download
+          in: query
+          required: false
+          description: Set to 1 to force browser attachment download
+          schema:
+            type: string
       responses:
         '200':
           description: File URL result

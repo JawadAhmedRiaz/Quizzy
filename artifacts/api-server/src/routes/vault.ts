@@ -303,7 +303,9 @@ router.get("/vault/:id/file-url", async (req, res): Promise<void> => {
     // If item has a Supabase Storage path, generate a 1-hour signed URL
     if (item.storagePath) {
       try {
-        const signedUrl = await getSignedUrl(item.storagePath, 3600);
+        const isDownload = req.query.download === "1";
+        const downloadFileName = isDownload ? (item.fileName || "download") : undefined;
+        const signedUrl = await getSignedUrl(item.storagePath, 3600, downloadFileName);
         res.json({
           url: signedUrl,
           fileName: item.fileName,

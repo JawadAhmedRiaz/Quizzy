@@ -23,6 +23,7 @@ import type {
   ErrorEnvelope,
   GetQuizLeaderboardParams,
   GetUserAnalyticsParams,
+  GetVaultFileUrlParams,
   GetVaultItemsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
@@ -1358,22 +1359,41 @@ export function useGetVaultItems<
 /**
  * @summary Get download or preview URL for a vault document
  */
-export const getGetVaultFileUrlUrl = (id: number) => {
-  return `/api/vault/${id}/file-url`;
+export const getGetVaultFileUrlUrl = (
+  id: number,
+  params?: GetVaultFileUrlParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/vault/${id}/file-url?${stringifiedParams}`
+    : `/api/vault/${id}/file-url`;
 };
 
 export const getVaultFileUrl = async (
   id: number,
+  params?: GetVaultFileUrlParams,
   options?: RequestInit,
 ): Promise<VaultFileUrlResponse> => {
-  return customFetch<VaultFileUrlResponse>(getGetVaultFileUrlUrl(id), {
+  return customFetch<VaultFileUrlResponse>(getGetVaultFileUrlUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetVaultFileUrlQueryKey = (id: number) => {
-  return [`/api/vault/${id}/file-url`] as const;
+export const getGetVaultFileUrlQueryKey = (
+  id: number,
+  params?: GetVaultFileUrlParams,
+) => {
+  return [`/api/vault/${id}/file-url`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetVaultFileUrlQueryOptions = <
@@ -1381,6 +1401,7 @@ export const getGetVaultFileUrlQueryOptions = <
   TError = ErrorType<ErrorEnvelope>,
 >(
   id: number,
+  params?: GetVaultFileUrlParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getVaultFileUrl>>,
@@ -1392,11 +1413,12 @@ export const getGetVaultFileUrlQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetVaultFileUrlQueryKey(id);
+  const queryKey =
+    queryOptions?.queryKey ?? getGetVaultFileUrlQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getVaultFileUrl>>> = ({
     signal,
-  }) => getVaultFileUrl(id, { signal, ...requestOptions });
+  }) => getVaultFileUrl(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -1424,6 +1446,7 @@ export function useGetVaultFileUrl<
   TError = ErrorType<ErrorEnvelope>,
 >(
   id: number,
+  params?: GetVaultFileUrlParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getVaultFileUrl>>,
@@ -1433,7 +1456,7 @@ export function useGetVaultFileUrl<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetVaultFileUrlQueryOptions(id, options);
+  const queryOptions = getGetVaultFileUrlQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

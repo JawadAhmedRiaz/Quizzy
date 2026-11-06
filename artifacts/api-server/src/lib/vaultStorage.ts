@@ -118,19 +118,22 @@ export async function deleteVaultFile(storagePath: string): Promise<void> {
 
 /**
  * Generates a temporary signed URL for a private vault asset (default 1 hour / 3600 seconds).
+ * Accepts an optional download file name to set Content-Disposition attachment.
  */
 export async function getSignedUrl(
   storagePath: string,
-  expiresInSeconds: number = 3600
+  expiresInSeconds: number = 3600,
+  downloadFileName?: string
 ): Promise<string> {
   if (!storagePath) {
     throw new Error("storagePath is required to generate signed URL.");
   }
   const supabase = getSupabaseClient();
 
+  const options = downloadFileName ? { download: downloadFileName } : undefined;
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)
-    .createSignedUrl(storagePath, expiresInSeconds);
+    .createSignedUrl(storagePath, expiresInSeconds, options);
 
   if (error || !data?.signedUrl) {
     throw new Error(`Failed to generate signed URL: ${error?.message || "Unknown error"}`);

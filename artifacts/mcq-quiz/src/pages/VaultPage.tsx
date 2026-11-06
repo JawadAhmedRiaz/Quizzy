@@ -34,6 +34,34 @@ export interface VaultDoc {
   isLegacy?: boolean;
 }
 
+export function getDocumentKind(mimeType?: string, fileName?: string): "image" | "pdf" | "office" | "other" {
+  const mime = (mimeType || "").trim().toLowerCase();
+  const ext = (fileName || "").split(".").pop()?.toLowerCase() || "";
+
+  // 1. Decide strictly by mimeType if present
+  if (mime) {
+    if (mime.startsWith("image/")) return "image";
+    if (mime === "application/pdf") return "pdf";
+    if (
+      mime.includes("wordprocessingml") ||
+      mime.includes("presentationml") ||
+      mime.includes("spreadsheetml") ||
+      mime === "application/msword" ||
+      mime === "application/vnd.ms-powerpoint" ||
+      mime === "application/vnd.ms-excel"
+    ) {
+      return "office";
+    }
+  }
+
+  // 2. Fallback to extension only if mimeType is empty or unknown
+  if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+  if (["ppt", "pptx", "doc", "docx", "xls", "xlsx"].includes(ext)) return "office";
+
+  return "other";
+}
+
 const CATEGORIES = [
   { id: "all", label: "All Items", icon: "✨", color: "#007aff" },
   { id: "pdf", label: "PDFs & Slides", icon: "📑", color: "#ef4444" },
@@ -65,8 +93,9 @@ export function VaultPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fallbackOpen, setFallbackOpen] = useState<{ url: string; title: string; googleUrl?: string } | null>(null);
 
-  // Fetch signed URL whenever a document is selected for preview
+  // Fetch signed URL whenever a document is selected for preview (Desktop modal)
   useEffect(() => {
     if (!previewDoc) {
       setPreviewUrl(null);
@@ -87,6 +116,7 @@ export function VaultPage() {
     setPreviewError(null);
     setPreviewUrl(null);
 
+    // Normal signed URL without ?download=1 for inline viewing
     fetch(`${API}/vault/${previewDoc.id}/file-url`, { credentials: "include" })
       .then(async (res) => {
         if (!res.ok) {
@@ -116,14 +146,69 @@ export function VaultPage() {
     };
   }, [previewDoc]);
 
-  // Handle direct download from card without opening preview modal
-  const handleDirectDownload = async (doc: VaultDoc, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Handle document card or preview click:
+  // On narrow screens (phones, max-width: 768px): NO iframes.
+  // Opens a new tab immediately and synchronously to prevent iOS Safari popup blocking.
+  const handleCardClick = (item: VaultDoc) => {
+    const isPhone = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
+    if (isPhone) {
+      const newTab = window.open("about:blank", "_blank");
+      if (newTab) {
+        try {
+          newTab.document.write("<p style='font-family:system-ui,-apple-system,sans-serif;text-align:center;padding-top:40px;color:#64748b;font-size:14px;'>Loading document viewer...</p>");
+        } catch {}
+      }
+
+      fetch(`${API}/vault/${item.id}/file-url`, { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              throw new Error("Access restricted. Please sign in with an authorized student account.");
+            }
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "Failed to load document link.");
+          }
+          return res.json();
+        })
+        .then((data) => {
+          const kind = getDocumentKind(data.mimeType || item.mimeType, data.fileName || item.fileName);
+          let targetUrl = data.url;
+          let googleUrl: string | undefined;
+
+          if (kind === "office") {
+            targetUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(data.url)}`;
+            googleUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(data.url)}`;
+          }
+
+          if (newTab && !newTab.closed) {
+            newTab.location.href = targetUrl;
+          } else {
+            // Popup was blocked by browser
+            setFallbackOpen({ url: targetUrl, title: item.title, googleUrl });
+          }
+        })
+        .catch((err) => {
+          if (newTab && !newTab.closed) {
+            try {
+              newTab.document.write(`<p style='font-family:system-ui,-apple-system,sans-serif;text-align:center;padding-top:40px;color:#ef4444;font-size:14px;'>${err.message}</p>`);
+            } catch {}
+          }
+          alert(err.message || "Failed to open document.");
+        });
+      return;
+    }
+
+    // Wide screens / Desktop: open modal with inline viewer
+    setPreviewDoc(item);
+  };
+
+  // Handle direct download: forces Content-Disposition attachment via ?download=1
+  const handleDirectDownload = async (doc: VaultDoc, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (doc.fileUrl) {
       const a = document.createElement("a");
       a.href = doc.fileUrl;
       a.download = doc.fileName;
-      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -132,7 +217,7 @@ export function VaultPage() {
 
     setDownloadingId(doc.id);
     try {
-      const res = await fetch(`${API}/vault/${doc.id}/file-url`, { credentials: "include" });
+      const res = await fetch(`${API}/vault/${doc.id}/file-url?download=1`, { credentials: "include" });
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           alert("This document is restricted. Please sign in with an authorized student account.");
@@ -146,7 +231,6 @@ export function VaultPage() {
         const a = document.createElement("a");
         a.href = data.url;
         a.download = data.fileName || doc.fileName;
-        a.target = "_blank";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -513,7 +597,7 @@ export function VaultPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="vault-glass-card p-5 flex flex-col justify-between group cursor-pointer"
-                    onClick={() => setPreviewDoc(item)}
+                    onClick={() => handleCardClick(item)}
                   >
                     <div>
                       {/* Top Row: Subject pill + category badge */}
@@ -595,7 +679,7 @@ export function VaultPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPreviewDoc(item);
+                            handleCardClick(item);
                           }}
                           className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
                           title="Preview"
@@ -703,16 +787,15 @@ export function VaultPage() {
 
                     {/* Download button */}
                     {previewUrl && (
-                      <a
-                        href={previewUrl}
-                        download={previewDoc.fileName}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1.5"
+                      <button
+                        type="button"
+                        onClick={() => handleDirectDownload(previewDoc)}
+                        disabled={downloadingId === previewDoc.id}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <span>⬇️</span>
-                        <span className="hidden sm:inline">Download</span>
-                      </a>
+                        <span className="hidden sm:inline">{downloadingId === previewDoc.id ? "Preparing..." : "Download"}</span>
+                      </button>
                     )}
 
                     {/* Close button */}
@@ -755,47 +838,80 @@ export function VaultPage() {
                       </button>
                     </div>
                   ) : previewUrl ? (
-                    previewUrl.startsWith("data:image/") || previewDoc.mimeType?.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(previewDoc.fileName) ? (
-                      <img
-                        src={previewUrl}
-                        alt={previewDoc.title}
-                        className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-xl shadow`}
-                      />
-                    ) : previewUrl.startsWith("data:application/pdf") || previewDoc.fileName.toLowerCase().endsWith(".pdf") || previewDoc.mimeType === "application/pdf" ? (
-                      <iframe
-                        src={previewUrl}
-                        title={previewDoc.title}
-                        className={`w-full rounded-xl border border-border ${isFullscreen ? "h-full" : "h-[50vh]"}`}
-                      />
-                    ) : (
-                      <div className="text-center p-8 flex flex-col items-center justify-center">
-                        <span className="text-5xl block mb-3">
-                          {/\.(pptx?|ppsx?)$/i.test(previewDoc.fileName)
-                            ? "📊"
-                            : /\.(docx?|rtf)$/i.test(previewDoc.fileName)
-                            ? "📝"
-                            : "📄"}
-                        </span>
-                        <p className="text-sm font-bold text-foreground mb-1">{previewDoc.fileName}</p>
-                        <p className="text-xs text-muted-foreground max-w-md mb-2">
-                          {/\.(pptx?|ppsx?|docx?|xlsx?)$/i.test(previewDoc.fileName)
-                            ? "Office documents (.docx, .pptx) cannot be rendered directly in the browser tab. Download to view in Microsoft Office or Google Docs."
-                            : `Stored in Study Vault (${previewDoc.fileSize || "File available"})`}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mb-4">
-                          File size: {previewDoc.fileSize || "Ready"}
-                        </p>
-                        <a
-                          href={previewUrl}
-                          download={previewDoc.fileName}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow inline-flex items-center gap-1.5 transition-all hover:scale-105"
-                        >
-                          <span>⬇️ Download & Open</span>
-                        </a>
-                      </div>
-                    )
+                    (() => {
+                      const docKind = getDocumentKind(previewDoc.mimeType, previewDoc.fileName);
+                      if (docKind === "image") {
+                        return (
+                          <img
+                            src={previewUrl}
+                            alt={previewDoc.title}
+                            className={`${isFullscreen ? "max-h-full" : "max-h-[50vh]"} w-auto object-contain rounded-xl shadow`}
+                          />
+                        );
+                      }
+                      if (docKind === "pdf") {
+                        return (
+                          <iframe
+                            src={previewUrl}
+                            title={previewDoc.title}
+                            className={`w-full rounded-xl border border-border ${isFullscreen ? "h-full" : "h-[50vh]"}`}
+                          />
+                        );
+                      }
+                      if (docKind === "office") {
+                        return (
+                          <div className="w-full h-full flex flex-col gap-2">
+                            <div className="flex items-center justify-between px-3 py-2 bg-muted/70 rounded-xl text-xs border border-border">
+                              <span className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                                <span>📊</span>
+                                <span>Office Online Viewer</span>
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <a
+                                  href={`https://docs.google.com/viewer?url=${encodeURIComponent(previewUrl)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:underline font-bold flex items-center gap-1"
+                                >
+                                  Try Google viewer <ExternalLink className="w-3 h-3" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDirectDownload(previewDoc)}
+                                  disabled={downloadingId === previewDoc.id}
+                                  className="px-3 py-1 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 shadow flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <span>⬇️</span>
+                                  <span>Download</span>
+                                </button>
+                              </div>
+                            </div>
+                            <iframe
+                              src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
+                              title={previewDoc.title}
+                              className={`w-full rounded-xl border border-border ${isFullscreen ? "h-[calc(100vh-210px)]" : "h-[50vh]"}`}
+                            />
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="text-center p-8 flex flex-col items-center justify-center">
+                          <span className="text-5xl block mb-3">📄</span>
+                          <p className="text-sm font-bold text-foreground mb-1">{previewDoc.fileName}</p>
+                          <p className="text-xs text-muted-foreground max-w-md mb-2">
+                            Stored in Study Vault ({previewDoc.fileSize || "File available"})
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleDirectDownload(previewDoc)}
+                            disabled={downloadingId === previewDoc.id}
+                            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow inline-flex items-center gap-1.5 transition-all hover:scale-105 disabled:opacity-50"
+                          >
+                            <span>⬇️ Download & Open</span>
+                          </button>
+                        </div>
+                      );
+                    })()
                   ) : null}
                 </div>
 
@@ -810,6 +926,45 @@ export function VaultPage() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Fallback open link for mobile users when popup was blocked */}
+        {fallbackOpen && (
+          <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 p-4 rounded-2xl bg-card border border-border shadow-2xl flex items-center justify-between gap-3">
+            <div className="text-xs min-w-0">
+              <p className="font-bold text-foreground">Document Ready</p>
+              <p className="text-muted-foreground truncate max-w-[200px]">{fallbackOpen.title}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <a
+                href={fallbackOpen.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow"
+                onClick={() => setFallbackOpen(null)}
+              >
+                Open Viewer
+              </a>
+              {fallbackOpen.googleUrl && (
+                <a
+                  href={fallbackOpen.googleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-500 font-bold hover:underline"
+                  onClick={() => setFallbackOpen(null)}
+                >
+                  Google
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setFallbackOpen(null)}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

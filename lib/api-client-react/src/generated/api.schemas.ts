@@ -198,3 +198,10 @@ export type GetVaultItemsParams = {
   subjectId?: number;
   category?: string;
 };
+
+export type GetVaultFileUrlParams = {
+  /**
+   * Set to 1 to force browser attachment download
+   */
+  download?: string;
+};

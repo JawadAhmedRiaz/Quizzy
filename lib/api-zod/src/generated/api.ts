@@ -277,6 +277,13 @@ export const GetVaultFileUrlParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const GetVaultFileUrlQueryParams = zod.object({
+  download: zod.coerce
+    .string()
+    .optional()
+    .describe("Set to 1 to force browser attachment download"),
+});
+
 export const GetVaultFileUrlResponse = zod.object({
   url: zod.string(),
   fileName: zod.string(),
