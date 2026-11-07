@@ -45,11 +45,16 @@ router.get("/subjects", async (req, res): Promise<void> => {
       const countsMap: Record<string, number> = {};
       const derivedTypes: string[] = [];
       for (const row of examCounts) {
-        countsMap[row.examType.toLowerCase()] = Number(row.count);
-        derivedTypes.push(row.examType);
+        if (!row.examType || !row.examType.trim()) continue;
+        const cleanType = row.examType.trim();
+        countsMap[cleanType.toLowerCase()] = (countsMap[cleanType.toLowerCase()] ?? 0) + Number(row.count);
+        if (!derivedTypes.includes(cleanType)) {
+          derivedTypes.push(cleanType);
+        }
       }
 
-      const merged = Array.from(new Set([...explicitTypes, ...derivedTypes]));
+      const cleanExplicit = explicitTypes.map((t) => t.trim()).filter(Boolean);
+      const merged = Array.from(new Set([...cleanExplicit, ...derivedTypes]));
       return { ...s, examTypes: merged, questionCounts: countsMap };
     }),
   );
@@ -100,7 +105,7 @@ router.get("/quiz-questions/:quizId", async (req, res): Promise<void> => {
       and(
         eq(questionsTable.sem, subject.sem),
         eq(questionsTable.subject, subject.name),
-        ilike(questionsTable.examType, decodedExamType),
+        sql`TRIM(BOTH FROM ${questionsTable.examType}) ILIKE ${decodedExamType}`,
       ),
     );
 
