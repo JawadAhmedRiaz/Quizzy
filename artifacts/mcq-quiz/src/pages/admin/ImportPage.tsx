@@ -37,12 +37,14 @@ interface ParsedQuestion {
   sem: number;
   subject: string;
   examType: string;
+  subjectId?: number;
 }
 
 type Stage = "input" | "parsing" | "review" | "committing" | "done";
 
 export function ImportPage() {
   const [sem, setSem] = useState(2);
+  const [subjectId, setSubjectId] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
   const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
@@ -68,6 +70,7 @@ export function ImportPage() {
   // Fetch subjects from DB whenever sem changes
   useEffect(() => {
     setSubjectsLoading(true);
+    setSubjectId(null);
     setSubject("");
     setIsCustomExamType(false);
     setCustomExamTypeInput("");
@@ -77,32 +80,39 @@ export function ImportPage() {
         setSubjectOptions(data);
         if (data.length > 0) {
           const first = data[0];
+          setSubjectId(first.id);
           setSubject(first.name);
           const types = parseExamTypes(first.examTypes);
           setExamType(types.length > 0 ? types[0] : "Midterm");
         } else {
+          setSubjectId(null);
+          setSubject("");
           setExamType("Midterm");
         }
       })
       .catch(() => {
         setSubjectOptions([]);
+        setSubjectId(null);
+        setSubject("");
         setExamType("Midterm");
       })
       .finally(() => setSubjectsLoading(false));
   }, [sem]);
 
-  function handleSubjectChange(newSubName: string) {
-    setSubject(newSubName);
+  function handleSubjectChange(newSubId: number) {
+    const subObj = subjectOptions.find(s => s.id === newSubId);
+    if (!subObj) return;
+    setSubjectId(subObj.id);
+    setSubject(subObj.name);
     setIsCustomExamType(false);
     setCustomExamTypeInput("");
-    const subObj = subjectOptions.find(s => s.name === newSubName);
-    const types = subObj ? parseExamTypes(subObj.examTypes) : [];
+    const types = parseExamTypes(subObj.examTypes);
     setExamType(types.length > 0 ? types[0] : "Midterm");
   }
 
   const selectedSubjectObj = useMemo(
-    () => subjectOptions.find(s => s.name === subject),
-    [subjectOptions, subject]
+    () => (subjectId ? subjectOptions.find(s => s.id === subjectId) : subjectOptions.find(s => s.name === subject)),
+    [subjectOptions, subjectId, subject]
   );
 
   const configuredExamTypes = useMemo(
@@ -186,7 +196,7 @@ export function ImportPage() {
 
   async function handleParse() {
     if (!rawText.trim()) { setError("Please paste your MCQ text first."); return; }
-    if (!subject) { setError("Please select a subject (or import questions first to populate subjects)."); return; }
+    if (!subjectId || !subject) { setError("Please select an existing subject (or create it in Content Settings first)."); return; }
     setError(null);
     setStage("parsing");
     try {
@@ -212,6 +222,7 @@ export function ImportPage() {
         sem,
         subject,
         examType,
+        subjectId: subjectId ?? undefined,
       }));
       setQuestions(tagged);
       setStage("review");
@@ -235,7 +246,13 @@ export function ImportPage() {
       const r = await fetch(`${API}/admin/questions/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questions }),
+        body: JSON.stringify({
+          questions: questions.map(q => ({
+            ...q,
+            subjectId: q.subjectId ?? subjectId ?? undefined,
+          })),
+          subjectId: subjectId ?? undefined,
+        }),
       });
       const data = await r.json();
       if (!r.ok) { setError((data as { error?: string }).error ?? "Commit failed"); setStage("review"); return; }
@@ -316,8 +333,8 @@ export function ImportPage() {
                     {subjectsLoading && <span className="ml-1.5 text-[10px]" style={{ color: "#64748b" }}>loading…</span>}
                   </label>
                   {subjectOptions.length > 0 ? (
-                    <select value={subject} onChange={e => handleSubjectChange(e.target.value)} style={selectStyle}>
-                      {subjectOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    <select value={subjectId ?? ""} onChange={e => handleSubjectChange(Number(e.target.value))} style={selectStyle}>
+                      {subjectOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   ) : (
                     <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
@@ -326,8 +343,8 @@ export function ImportPage() {
                     </div>
                   )}
                   {!subjectsLoading && subjectOptions.length === 0 && (
-                    <p className="text-[10px] mt-1" style={{ color: "#475569" }}>
-                      Add questions first via manual import to create subjects, or type a name below.
+                    <p className="text-[10px] mt-1" style={{ color: "#ef4444" }}>
+                      No subjects configured for Semester ${sem}. Please create it in Content Settings first.
                     </p>
                   )}
                 </div>

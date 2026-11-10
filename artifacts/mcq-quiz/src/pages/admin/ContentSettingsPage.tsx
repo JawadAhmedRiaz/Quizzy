@@ -54,6 +54,8 @@ export function ContentSettingsPage() {
   // Exam type form
   const [newExamType, setNewExamType] = useState("");
   const [savingET, setSavingET] = useState(false);
+  const [editingET, setEditingET] = useState<string | null>(null);
+  const [editingETValue, setEditingETValue] = useState("");
 
   const [acting, setActing] = useState<string | null>(null);
 
@@ -148,11 +150,48 @@ export function ContentSettingsPage() {
   }
 
   async function deleteSubject(id: number) {
-    if (!confirm("Delete this subject? MCQs belonging to it will remain in the database.")) return;
+    if (!confirm("Are you sure you want to delete this subject?")) return;
     setActing(`sub-del-${id}`);
-    await fetch(`${API}/admin/subjects/${id}`, { method: "DELETE" });
+    const r = await fetch(`${API}/admin/subjects/${id}`, { method: "DELETE" });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      if (data.questionCount) {
+        if (confirm(`${data.error}\n\nDo you want to permanently delete this subject and ALL its ${data.questionCount} question(s)?`)) {
+          const forceRes = await fetch(`${API}/admin/subjects/${id}?force=true`, { method: "DELETE" });
+          if (!forceRes.ok) {
+            const forceData = await forceRes.json().catch(() => ({}));
+            alert(forceData.error || "Failed to force delete subject");
+          }
+        }
+      } else {
+        alert(data.error || "Failed to delete subject");
+      }
+    }
     setActing(null);
     if (selectedSem) void loadSubjects(selectedSem.num);
+  }
+
+  async function renameExamType(oldType: string, newType: string) {
+    if (!selectedSubject || !newType.trim() || oldType.trim().toLowerCase() === newType.trim().toLowerCase()) {
+      setEditingET(null);
+      return;
+    }
+    setSavingET(true);
+    const r = await fetch(`${API}/admin/subjects/${selectedSubject.id}/exam-types/rename`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldType, newType: newType.trim() }),
+    });
+    if (r.ok) {
+      const data = await r.json() as { subject: SubjectRow; affectedQuestions: number };
+      setSelectedSubject(data.subject);
+      setSubjects(prev => prev.map(s => s.id === data.subject.id ? data.subject : s));
+    } else {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || "Failed to rename exam type");
+    }
+    setEditingET(null);
+    setSavingET(false);
   }
 
   function drillIntoSubject(sub: SubjectRow) {
@@ -478,29 +517,68 @@ export function ContentSettingsPage() {
                 {getExamTypes(selectedSubject).map(et => (
                   <div key={et} className="rounded-xl px-4 py-3 flex items-center justify-between"
                     style={{ background: "#1e293b", border: "1px solid #334155" }}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 mr-3">
                       <span className="text-xl">📝</span>
-                      <div>
-                        <p className="text-sm font-bold text-white">{et}</p>
-                        <p className="text-xs" style={{ color: "#64748b" }}>Exam type — students see this as quiz option</p>
+                      {editingET === et ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            value={editingETValue}
+                            onChange={e => setEditingETValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") void renameExamType(et, editingETValue);
+                              if (e.key === "Escape") setEditingET(null);
+                            }}
+                            autoFocus
+                            style={{ ...IS, flex: 1, padding: "4px 8px" }}
+                          />
+                          <button
+                            onClick={() => void renameExamType(et, editingETValue)}
+                            disabled={savingET || !editingETValue.trim()}
+                            className="px-2.5 py-1 rounded text-xs font-bold"
+                            style={{ background: "#6366f1", color: "#fff" }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingET(null)}
+                            className="px-2.5 py-1 rounded text-xs font-medium"
+                            style={{ background: "#334155", color: "#94a3b8" }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-bold text-white">{et}</p>
+                          <p className="text-xs" style={{ color: "#64748b" }}>Exam type — students see this as quiz option</p>
+                        </div>
+                      )}
+                    </div>
+                    {editingET !== et && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditingET(et); setEditingETValue(et); }}
+                          className="px-2.5 py-1 rounded text-xs font-medium"
+                          style={{ background: "rgba(148,163,184,0.1)", color: "#94a3b8", border: "1px solid #334155" }}
+                        >
+                          ✏️ Rename
+                        </button>
+                        <button onClick={() => navigate(`/admin/import`)}
+                          className="px-3 py-1 rounded text-xs font-semibold"
+                          style={{ background: "rgba(99,102,241,0.12)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.2)" }}>
+                          Add MCQs
+                        </button>
+                        <button
+                          onClick={() => navigate(`/admin/mcq-bank?subject=${encodeURIComponent(selectedSubject.name)}&examType=${encodeURIComponent(et)}`)}
+                          className="px-3 py-1 rounded text-xs font-semibold"
+                          style={{ background: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.2)" }}>
+                          View MCQs
+                        </button>
+                        <button onClick={() => removeExamType(et)} disabled={savingET}
+                          className="px-2 py-1 rounded text-xs font-semibold"
+                          style={{ background: "rgba(239,68,68,0.08)", color: "#f87171" }}>🗑</button>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => navigate(`/admin/import`)}
-                        className="px-3 py-1 rounded text-xs font-semibold"
-                        style={{ background: "rgba(99,102,241,0.12)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.2)" }}>
-                        Add MCQs
-                      </button>
-                      <button
-                        onClick={() => navigate(`/admin/mcq-bank?subject=${encodeURIComponent(selectedSubject.name)}&examType=${encodeURIComponent(et)}`)}
-                        className="px-3 py-1 rounded text-xs font-semibold"
-                        style={{ background: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.2)" }}>
-                        View MCQs
-                      </button>
-                      <button onClick={() => removeExamType(et)} disabled={savingET}
-                        className="px-2 py-1 rounded text-xs font-semibold"
-                        style={{ background: "rgba(239,68,68,0.08)", color: "#f87171" }}>🗑</button>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -1,3 +1,15 @@
+/**
+ * ⚠️ WARNING: DO NOT RUN THIS SCRIPT ON A LIVE DATABASE!
+ * Questions are linked to subjects by subject_id.
+ * Running this script will insert subjects by hardcoded text names and can create
+ * duplicate split subjects or unlinked questions if subjects have been renamed.
+ */
+if (process.env.ALLOW_LEGACY_CURRICULUM_SEED !== "true") {
+  console.error("🛑 [SAFETY GUARD] migrate-all-curriculum is disabled to prevent duplicate subjects after renames.");
+  console.error("Set ALLOW_LEGACY_CURRICULUM_SEED=true only if you intend to run this in a blank development DB.");
+  process.exit(1);
+}
+
 import { db, semestersTable, subjectsTable, questionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { ALL_Q } from "../../artifacts/mcq-quiz/src/data/questions";

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, asc, sql, ilike } from "drizzle-orm";
+import { eq, and, or, isNull, asc, sql, ilike } from "drizzle-orm";
 import { db, subjectsTable, questionsTable, semestersTable, systemConfigsTable } from "@workspace/db";
 import { autoGenerateMissingBriefings } from "../lib/explanationService";
 
@@ -35,12 +35,21 @@ router.get("/subjects", async (req, res): Promise<void> => {
 
       const examCounts = await db
         .select({
-          examType: questionsTable.examType,
+          examType: sql<string>`TRIM(BOTH FROM ${questionsTable.examType})`,
           count: sql<number>`count(*)::int`,
         })
         .from(questionsTable)
-        .where(and(eq(questionsTable.sem, s.sem), eq(questionsTable.subject, s.name)))
-        .groupBy(questionsTable.examType);
+        .where(
+          or(
+            eq(questionsTable.subjectId, s.id),
+            and(
+              isNull(questionsTable.subjectId),
+              eq(questionsTable.sem, s.sem),
+              sql`LOWER(TRIM(${questionsTable.subject})) = LOWER(TRIM(${s.name}))`
+            )
+          )
+        )
+        .groupBy(sql`TRIM(BOTH FROM ${questionsTable.examType})`);
 
       const countsMap: Record<string, number> = {};
       const derivedTypes: string[] = [];
@@ -103,8 +112,14 @@ router.get("/quiz-questions/:quizId", async (req, res): Promise<void> => {
     .from(questionsTable)
     .where(
       and(
-        eq(questionsTable.sem, subject.sem),
-        eq(questionsTable.subject, subject.name),
+        or(
+          eq(questionsTable.subjectId, subject.id),
+          and(
+            isNull(questionsTable.subjectId),
+            eq(questionsTable.sem, subject.sem),
+            sql`LOWER(TRIM(${questionsTable.subject})) = LOWER(TRIM(${subject.name}))`
+          )
+        ),
         sql`TRIM(BOTH FROM ${questionsTable.examType}) ILIKE ${decodedExamType}`,
       ),
     );

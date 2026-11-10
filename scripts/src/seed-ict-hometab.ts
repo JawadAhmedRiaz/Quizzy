@@ -1,3 +1,15 @@
+/**
+ * ⚠️ WARNING: DO NOT RUN THIS SCRIPT ON A LIVE DATABASE!
+ * Questions are linked to subjects by subject_id.
+ * Running this script inserts questions with hardcoded text subject='ICT' without subject_id,
+ * creating unlinked questions if "ICT" was renamed.
+ */
+if (process.env.ALLOW_LEGACY_ICT_SEED !== "true") {
+  console.error("🛑 [SAFETY GUARD] seed-ict-hometab is disabled to prevent orphan questions after renames.");
+  console.error("Set ALLOW_LEGACY_ICT_SEED=true only if you intend to run this in a blank development DB.");
+  process.exit(1);
+}
+
 import pg from "pg";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;

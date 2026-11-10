@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, count, max, sum, ilike, and, inArray } from "drizzle-orm";
+import { eq, desc, count, max, sum, ilike, and, or, isNull, inArray, sql } from "drizzle-orm";
 import multer from "multer";
 import {
   db,
@@ -126,16 +126,115 @@ router.put("/admin/subjects/:id", adminMiddleware, async (req, res): Promise<voi
   if (gradient !== undefined) updateData.gradient = gradient;
   if (isActive !== undefined) updateData.isActive = Boolean(isActive);
   if (Array.isArray(examTypes)) updateData.examTypes = JSON.stringify(examTypes);
-  const [updated] = await db.update(subjectsTable).set(updateData).where(eq(subjectsTable.id, id)).returning();
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(updated);
+
+  let updatedSubject: typeof subjectsTable.$inferSelect | undefined;
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(subjectsTable).set(updateData).where(eq(subjectsTable.id, id)).returning();
+    if (!updated) return;
+    updatedSubject = updated;
+
+    // If subject name was renamed, keep text copy in questions in sync for display
+    if (typeof name === "string" && name.trim()) {
+      await tx.update(questionsTable)
+        .set({ subject: name.trim() })
+        .where(eq(questionsTable.subjectId, id));
+    }
+  });
+
+  if (!updatedSubject) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updatedSubject);
+});
+
+router.put("/admin/subjects/:id/exam-types/rename", adminMiddleware, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { oldType, newType } = req.body;
+  if (!oldType || !newType || !String(newType).trim()) {
+    res.status(400).json({ error: "oldType and newType are required" });
+    return;
+  }
+  const trimmedOld = String(oldType).trim();
+  const trimmedNew = String(newType).trim();
+
+  const [subject] = await db.select().from(subjectsTable).where(eq(subjectsTable.id, id));
+  if (!subject) {
+    res.status(404).json({ error: "Subject not found" });
+    return;
+  }
+
+  let currentTypes: string[] = [];
+  try { currentTypes = JSON.parse(subject.examTypes); } catch { currentTypes = []; }
+  const updatedTypes = currentTypes.map((t) => t.trim().toLowerCase() === trimmedOld.toLowerCase() ? trimmedNew : t);
+  if (!updatedTypes.some((t) => t.toLowerCase() === trimmedNew.toLowerCase())) {
+    updatedTypes.push(trimmedNew);
+  }
+
+  let updatedSubject: typeof subjectsTable.$inferSelect | undefined;
+  let affectedQuestions = 0;
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(subjectsTable).set({ examTypes: JSON.stringify(updatedTypes) }).where(eq(subjectsTable.id, id)).returning();
+    updatedSubject = updated;
+
+    const qUpdate = await tx.update(questionsTable)
+      .set({ examType: trimmedNew })
+      .where(
+        and(
+          eq(questionsTable.subjectId, id),
+          sql`TRIM(BOTH FROM ${questionsTable.examType}) ILIKE ${trimmedOld}`
+        )
+      )
+      .returning({ id: questionsTable.id });
+    affectedQuestions = qUpdate.length;
+  });
+
+  res.json({ subject: updatedSubject, affectedQuestions });
 });
 
 router.delete("/admin/subjects/:id", adminMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-  await db.delete(subjectsTable).where(eq(subjectsTable.id, id));
-  res.json({ success: true });
+
+  const [subject] = await db.select().from(subjectsTable).where(eq(subjectsTable.id, id));
+  if (!subject) { res.status(404).json({ error: "Subject not found" }); return; }
+
+  // Check if subject has questions linked
+  const [qStat] = await db
+    .select({ c: count() })
+    .from(questionsTable)
+    .where(
+      or(
+        eq(questionsTable.subjectId, id),
+        and(isNull(questionsTable.subjectId), eq(questionsTable.sem, subject.sem), eq(questionsTable.subject, subject.name))
+      )
+    );
+
+  const qCount = qStat?.c ?? 0;
+  const force = req.query.force === "true" || (req.body && req.body.force === true);
+
+  if (qCount > 0 && !force) {
+    res.status(400).json({
+      error: `Cannot delete subject "${subject.name}" because it contains ${qCount} question(s). Delete or reassign its questions first, or pass force=true to confirm permanent deletion.`,
+      questionCount: qCount,
+    });
+    return;
+  }
+
+  // If force=true, delete questions and subject together in a single transaction
+  await db.transaction(async (tx) => {
+    if (qCount > 0) {
+      await tx.delete(questionsTable).where(
+        or(
+          eq(questionsTable.subjectId, id),
+          and(isNull(questionsTable.subjectId), eq(questionsTable.sem, subject.sem), eq(questionsTable.subject, subject.name))
+        )
+      );
+    }
+    await tx.delete(subjectsTable).where(eq(subjectsTable.id, id));
+  });
+
+  res.json({ success: true, deletedQuestions: qCount });
 });
 
 // ─── MCQ Chunked Extraction Utilities ────────────────────────────────────────
@@ -470,10 +569,39 @@ router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> 
 });
 
 router.post("/admin/questions/batch", adminMiddleware, async (req, res): Promise<void> => {
-  const { questions } = req.body;
+  const { questions, subjectId } = req.body;
   if (!Array.isArray(questions) || questions.length === 0) {
     res.status(400).json({ error: "questions array required" });
     return;
+  }
+
+  // Determine target subject: strictly require an existing subject row
+  let targetSubject: typeof subjectsTable.$inferSelect | undefined;
+
+  const rawSubId = subjectId ?? questions[0]?.subjectId;
+  if (rawSubId !== undefined && rawSubId !== null && !isNaN(Number(rawSubId))) {
+    const [found] = await db.select().from(subjectsTable).where(eq(subjectsTable.id, Number(rawSubId)));
+    targetSubject = found;
+    if (!targetSubject) {
+      res.status(400).json({ error: `Selected subject ID ${rawSubId} does not exist. Please create it in Content Settings first.` });
+      return;
+    }
+  } else {
+    const qSem = Number(questions[0]?.sem ?? 1);
+    const qSubjectName = String(questions[0]?.subject ?? "").trim();
+    if (!qSubjectName) {
+      res.status(400).json({ error: "Subject selection is required. Please select an existing subject." });
+      return;
+    }
+    const [found] = await db.select().from(subjectsTable)
+      .where(and(eq(subjectsTable.sem, qSem), sql`LOWER(TRIM(${subjectsTable.name})) = LOWER(TRIM(${qSubjectName}))`));
+    targetSubject = found;
+    if (!targetSubject) {
+      res.status(400).json({
+        error: `Subject "${qSubjectName}" does not exist in Semester ${qSem}. Automatic subject creation is disabled. Please create this subject first in Content Settings.`,
+      });
+      return;
+    }
   }
 
   const values = questions.map((q: Record<string, unknown>) => ({
@@ -485,35 +613,26 @@ router.post("/admin/questions/batch", adminMiddleware, async (req, res): Promise
     correctAnswer: String(q.Correct_Answer ?? q.correctAnswer ?? "A"),
     briefing: String(q.Briefing ?? q.briefing ?? "") || null,
     topic: String(q.Topic ?? q.topic ?? "") || null,
-    sem: Number(q.sem ?? 1),
-    subject: String(q.subject ?? ""),
-    examType: String(q.examType ?? "Midterm"),
+    sem: targetSubject!.sem,
+    subject: targetSubject!.name,
+    subjectId: targetSubject!.id,
+    examType: String(q.examType ?? "Midterm").trim(),
   }));
 
   const inserted = await db.insert(questionsTable).values(values).returning();
 
-  // Auto-upsert subjects + update examTypes
-  const pairs = new Map<string, { sem: number; name: string; examType: string }>();
+  // If the imported exam type is new for this existing subject, update its exam_types list
+  let ets: string[] = [];
+  try { ets = JSON.parse(targetSubject.examTypes); } catch (_e) { ets = []; }
+  let examTypesChanged = false;
   for (const v of values) {
-    const key = `${v.sem}::${v.subject}`;
-    if (v.subject) pairs.set(key, { sem: v.sem, name: v.subject, examType: v.examType });
-  }
-  for (const { sem, name, examType } of pairs.values()) {
-    await db.insert(subjectsTable)
-      .values({ sem, name, icon: "📚", color: "#6366f1", gradient: "linear-gradient(135deg,#4f46e5,#6366f1)", examTypes: JSON.stringify([examType]) })
-      .onConflictDoNothing();
-    const [existing] = await db.select().from(subjectsTable).where(and(eq(subjectsTable.sem, sem), eq(subjectsTable.name, name)));
-    if (existing) {
-      let ets: string[] = [];
-      try { ets = JSON.parse(existing.examTypes); } catch (_e) { ets = []; }
-      if (!ets.includes(examType)) {
-        ets.push(examType);
-        await db.update(subjectsTable).set({ examTypes: JSON.stringify(ets) }).where(eq(subjectsTable.id, existing.id));
-      }
+    if (!ets.some((e) => e.trim().toLowerCase() === v.examType.toLowerCase())) {
+      ets.push(v.examType);
+      examTypesChanged = true;
     }
-    const ordinals = ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th","11th","12th"];
-    const semLabel = `${ordinals[sem - 1] ?? sem + "th"} Semester`;
-    await db.insert(semestersTable).values({ num: sem, label: semLabel, sortOrder: sem }).onConflictDoNothing();
+  }
+  if (examTypesChanged) {
+    await db.update(subjectsTable).set({ examTypes: JSON.stringify(ets) }).where(eq(subjectsTable.id, targetSubject.id));
   }
 
   // Automatically generate AI explanations in the background for any new questions without briefings
@@ -521,16 +640,30 @@ router.post("/admin/questions/batch", adminMiddleware, async (req, res): Promise
     console.error("[Admin Batch] Auto-generate briefings error:", err)
   );
 
-  res.status(201).json({ inserted: inserted.length });
+  res.status(201).json({ inserted: inserted.length, subjectId: targetSubject.id, subject: targetSubject.name });
 });
 
 router.put("/admin/questions/:id", adminMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic, sem, subject, examType } = req.body;
+  const { question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic, sem, subject, examType, subjectId } = req.body;
+
+  let targetSubjectId = typeof subjectId === "number" ? subjectId : undefined;
+  if (!targetSubjectId && subject && sem) {
+    const [matched] = await db.select({ id: subjectsTable.id }).from(subjectsTable)
+      .where(and(eq(subjectsTable.sem, Number(sem)), sql`LOWER(TRIM(${subjectsTable.name})) = LOWER(TRIM(${subject}))`));
+    if (matched) targetSubjectId = matched.id;
+  }
+
   const [updated] = await db
     .update(questionsTable)
-    .set({ question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic, sem, subject, examType })
+    .set({
+      question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic,
+      sem: Number(sem),
+      subject: String(subject),
+      examType: String(examType).trim(),
+      ...(targetSubjectId !== undefined && { subjectId: targetSubjectId }),
+    })
     .where(eq(questionsTable.id, id))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }

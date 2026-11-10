@@ -1,3 +1,15 @@
+/**
+ * ⚠️ WARNING: DO NOT RUN THIS SCRIPT ON A LIVE DATABASE!
+ * Questions are linked to subjects by subject_id.
+ * Running this script will insert/upsert subjects by hardcoded name "ICT",
+ * creating duplicate split subjects if "ICT" has been renamed.
+ */
+if (process.env.ALLOW_LEGACY_ICT_SEED !== "true") {
+  console.error("🛑 [SAFETY GUARD] seed-ict is disabled to prevent duplicate subjects after renames.");
+  console.error("Set ALLOW_LEGACY_ICT_SEED=true only if you intend to run this in a blank development DB.");
+  process.exit(1);
+}
+
 import { db, semestersTable, subjectsTable, questionsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 
