@@ -42,9 +42,18 @@ export function MCQBankPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filterSem, setFilterSem] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
-  const [filterExamType, setFilterExamType] = useState("");
+  const [filterSem, setFilterSem] = useState(() => {
+    return new URLSearchParams(window.location.search).get("sem") ?? "";
+  });
+  const [filterSubjectId, setFilterSubjectId] = useState(() => {
+    return new URLSearchParams(window.location.search).get("subjectId") ?? "";
+  });
+  const [filterSubjectName, setFilterSubjectName] = useState(() => {
+    return new URLSearchParams(window.location.search).get("subject") ?? "";
+  });
+  const [filterExamType, setFilterExamType] = useState(() => {
+    return new URLSearchParams(window.location.search).get("examType") ?? "";
+  });
   const [editing, setEditing] = useState<Question | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -54,12 +63,24 @@ export function MCQBankPage() {
   const [allSubjects, setAllSubjects] = useState<SubjectRow[]>([]);
   useEffect(() => {
     fetch(`${API}/admin/subjects`).then(r => r.ok ? r.json() : [])
-      .then((rows: SubjectRow[]) => setAllSubjects(rows)).catch(() => {});
+      .then((rows: SubjectRow[]) => {
+        setAllSubjects(rows);
+        // If arrived with legacy ?subject= name, resolve to subjectId
+        const params = new URLSearchParams(window.location.search);
+        const legacySub = params.get("subject");
+        if (legacySub && !params.get("subjectId")) {
+          const match = rows.find(r => r.name.toLowerCase().trim() === legacySub.toLowerCase().trim());
+          if (match) {
+            setFilterSubjectId(String(match.id));
+            if (!params.get("sem")) setFilterSem(String(match.sem));
+          }
+        }
+      }).catch(() => {});
   }, []);
 
   const semNums = Array.from(new Set(allSubjects.map(s => s.sem))).sort((a,b) => a-b);
   const filteredSubjects = filterSem ? allSubjects.filter(s => s.sem === parseInt(filterSem)) : allSubjects;
-  const selectedSubjectRow = allSubjects.find(s => s.name === filterSubject && (filterSem ? s.sem === parseInt(filterSem) : true));
+  const selectedSubjectRow = allSubjects.find(s => String(s.id) === filterSubjectId || (filterSubjectName && s.name.toLowerCase() === filterSubjectName.toLowerCase()));
   const availableExamTypes = selectedSubjectRow ? parseET(selectedSubjectRow.examTypes) : [];
 
   const LIMIT = 20;
@@ -70,7 +91,15 @@ export function MCQBankPage() {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
       if (search) params.set("q", search);
       if (filterSem) params.set("sem", filterSem);
-      if (filterSubject) params.set("subject", filterSubject);
+      if (filterSubjectId) {
+        if (filterSubjectId === "__none__") {
+          params.set("unlinked", "true");
+        } else {
+          params.set("subjectId", filterSubjectId);
+        }
+      } else if (filterSubjectName) {
+        params.set("subject", filterSubjectName);
+      }
       if (filterExamType) params.set("examType", filterExamType);
       const r = await fetch(`${API}/admin/questions?${params}`);
       if (r.ok) {
@@ -79,7 +108,7 @@ export function MCQBankPage() {
         setTotal(data.total);
       }
     } finally { setLoading(false); }
-  }, [page, search, filterSem, filterSubject, filterExamType]);
+  }, [page, search, filterSem, filterSubjectId, filterSubjectName, filterExamType]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -138,25 +167,31 @@ export function MCQBankPage() {
             placeholder="🔎 Search questions…"
             style={{ ...inputStyle, width: 240 }}
           />
-          <select value={filterSem} onChange={e => { setFilterSem(e.target.value); setFilterSubject(""); setFilterExamType(""); setPage(1); }}
+          <select value={filterSem} onChange={e => { setFilterSem(e.target.value); setFilterSubjectId(""); setFilterSubjectName(""); setFilterExamType(""); setPage(1); }}
             style={{ ...inputStyle, width: 150, cursor: "pointer" }}>
             <option value="">All Semesters</option>
             {semNums.map(s => <option key={s} value={s}>Semester {s}</option>)}
           </select>
-          <select value={filterSubject} onChange={e => { setFilterSubject(e.target.value); setFilterExamType(""); setPage(1); }}
+          <select value={filterSubjectId || (filterSubjectName === "__none__" ? "__none__" : "")}
+            onChange={e => {
+              setFilterSubjectId(e.target.value);
+              setFilterSubjectName("");
+              setFilterExamType("");
+              setPage(1);
+            }}
             style={{ ...inputStyle, width: 190, cursor: "pointer" }}>
             <option value="">All Subjects</option>
             <option value="__none__">⚠️ No subject (Unlinked)</option>
-            {filteredSubjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            {filteredSubjects.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
-          {filterSubject && availableExamTypes.length > 0 && (
+          {(filterSubjectId || filterSubjectName) && availableExamTypes.length > 0 && (
             <select value={filterExamType} onChange={e => { setFilterExamType(e.target.value); setPage(1); }}
               style={{ ...inputStyle, width: 150, cursor: "pointer" }}>
               <option value="">All Types</option>
               {availableExamTypes.map(et => <option key={et} value={et}>{et}</option>)}
             </select>
           )}
-          <button onClick={() => { setSearch(""); setFilterSem(""); setFilterSubject(""); setFilterExamType(""); setPage(1); }}
+          <button onClick={() => { setSearch(""); setFilterSem(""); setFilterSubjectId(""); setFilterSubjectName(""); setFilterExamType(""); setPage(1); }}
             className="px-3 py-2 rounded-lg text-xs font-semibold"
             style={{ background: "#1e293b", color: "#64748b", border: "1px solid #334155", whiteSpace: "nowrap" }}>
             Clear

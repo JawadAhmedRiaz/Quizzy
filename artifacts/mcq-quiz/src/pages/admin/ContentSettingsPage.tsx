@@ -571,7 +571,7 @@ export function ContentSettingsPage() {
                           Add MCQs
                         </button>
                         <button
-                          onClick={() => navigate(`/admin/mcq-bank?subject=${encodeURIComponent(selectedSubject.name)}&examType=${encodeURIComponent(et)}`)}
+                          onClick={() => navigate(`/admin/mcq-bank?subjectId=${selectedSubject.id}&examType=${encodeURIComponent(et)}`)}
                           className="px-3 py-1 rounded text-xs font-semibold"
                           style={{ background: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.2)" }}>
                           View MCQs

@@ -549,7 +549,7 @@ router.post("/admin/extract-file", adminMiddleware, upload.single("file"), async
 // ─── Phase 3: Questions CRUD ──────────────────────────────────────────────
 
 router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> => {
-  const { q, sem, subject, examType, topic, unlinked, page = "1", limit = "50" } = req.query as Record<string, string>;
+  const { q, sem, subject, subjectId, examType, topic, unlinked, page = "1", limit = "50" } = req.query as Record<string, string>;
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50));
   const offset = (pageNum - 1) * limitNum;
@@ -557,12 +557,30 @@ router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> 
   const conditions = [];
   if (q) conditions.push(ilike(questionsTable.question, `%${q}%`));
   if (sem) conditions.push(eq(questionsTable.sem, parseInt(sem)));
-  if (subject === "__none__" || unlinked === "true") {
+
+  if (subjectId) {
+    conditions.push(eq(questionsTable.subjectId, parseInt(subjectId)));
+  } else if (subject === "__none__" || unlinked === "true") {
     conditions.push(isNull(questionsTable.subjectId));
   } else if (subject) {
-    conditions.push(eq(questionsTable.subject, subject));
+    // Resolve legacy subject name param: find matching subject row(s)
+    const trimmedSub = subject.trim();
+    const matchedSubs = await db.select({ id: subjectsTable.id }).from(subjectsTable)
+      .where(sql`LOWER(TRIM(${subjectsTable.name})) = LOWER(TRIM(${trimmedSub}))`);
+    if (matchedSubs.length > 0) {
+      const ids = matchedSubs.map(s => s.id);
+      conditions.push(or(
+        inArray(questionsTable.subjectId, ids),
+        sql`LOWER(TRIM(${questionsTable.subject})) = LOWER(TRIM(${trimmedSub}))`
+      ));
+    } else {
+      conditions.push(sql`LOWER(TRIM(${questionsTable.subject})) = LOWER(TRIM(${trimmedSub}))`);
+    }
   }
-  if (examType) conditions.push(eq(questionsTable.examType, examType));
+
+  if (examType) {
+    conditions.push(sql`TRIM(BOTH FROM ${questionsTable.examType}) ILIKE ${examType.trim()}`);
+  }
   if (topic) conditions.push(ilike(questionsTable.topic, `%${topic}%`));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -572,7 +590,14 @@ router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> 
     db.select({ total: count() }).from(questionsTable).where(where),
   ]);
 
-  res.json({ questions: rows, total, page: pageNum, limit: limitNum });
+  const allSubRows = await db.select({ id: subjectsTable.id, name: subjectsTable.name }).from(subjectsTable);
+  const subMap = new Map(allSubRows.map(s => [s.id, s.name]));
+  const enrichedRows = rows.map(r => ({
+    ...r,
+    subject: r.subjectId && subMap.has(r.subjectId) ? subMap.get(r.subjectId)! : r.subject,
+  }));
+
+  res.json({ questions: enrichedRows, total, page: pageNum, limit: limitNum });
 });
 
 router.post("/admin/questions/batch", adminMiddleware, async (req, res): Promise<void> => {
@@ -656,18 +681,31 @@ router.put("/admin/questions/:id", adminMiddleware, async (req, res): Promise<vo
   const { question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic, sem, subject, examType, subjectId } = req.body;
 
   let targetSubjectId = typeof subjectId === "number" ? subjectId : undefined;
-  if (!targetSubjectId && subject && sem) {
-    const [matched] = await db.select({ id: subjectsTable.id }).from(subjectsTable)
+  let targetSubjectName = subject ? String(subject).trim() : undefined;
+  let targetSem = sem !== undefined ? Number(sem) : undefined;
+
+  if (targetSubjectId) {
+    const [foundSub] = await db.select().from(subjectsTable).where(eq(subjectsTable.id, targetSubjectId));
+    if (foundSub) {
+      targetSubjectName = foundSub.name;
+      targetSem = foundSub.sem;
+    }
+  } else if (subject && sem) {
+    const [matched] = await db.select().from(subjectsTable)
       .where(and(eq(subjectsTable.sem, Number(sem)), sql`LOWER(TRIM(${subjectsTable.name})) = LOWER(TRIM(${subject}))`));
-    if (matched) targetSubjectId = matched.id;
+    if (matched) {
+      targetSubjectId = matched.id;
+      targetSubjectName = matched.name;
+      targetSem = matched.sem;
+    }
   }
 
   const [updated] = await db
     .update(questionsTable)
     .set({
       question, optionA, optionB, optionC, optionD, correctAnswer, briefing, topic,
-      sem: Number(sem),
-      subject: String(subject),
+      ...(targetSem !== undefined && { sem: targetSem }),
+      ...(targetSubjectName !== undefined && { subject: targetSubjectName }),
       examType: String(examType).trim(),
       ...(targetSubjectId !== undefined && { subjectId: targetSubjectId }),
     })
@@ -752,9 +790,17 @@ router.get("/admin/flags", adminMiddleware, async (req, res): Promise<void> => {
     let examType: string | null = null;
     const numericId = parseInt(flag.questionId);
     if (!isNaN(numericId)) {
-      const [q] = await db.select({ sem: questionsTable.sem, subject: questionsTable.subject, examType: questionsTable.examType })
+      const [q] = await db.select({ sem: questionsTable.sem, subject: questionsTable.subject, subjectId: questionsTable.subjectId, examType: questionsTable.examType })
         .from(questionsTable).where(eq(questionsTable.id, numericId));
-      if (q) { sem = q.sem; subject = q.subject; examType = q.examType; }
+      if (q) {
+        sem = q.sem;
+        subject = q.subject;
+        examType = q.examType;
+        if (q.subjectId) {
+          const [sub] = await db.select({ name: subjectsTable.name }).from(subjectsTable).where(eq(subjectsTable.id, q.subjectId));
+          if (sub) subject = sub.name;
+        }
+      }
     }
     return { ...flag, createdAt: flag.createdAt.toISOString(), sem, subject, examType };
   }));
