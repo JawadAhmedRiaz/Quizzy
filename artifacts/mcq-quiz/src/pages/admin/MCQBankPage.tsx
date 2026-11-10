@@ -144,8 +144,9 @@ export function MCQBankPage() {
             {semNums.map(s => <option key={s} value={s}>Semester {s}</option>)}
           </select>
           <select value={filterSubject} onChange={e => { setFilterSubject(e.target.value); setFilterExamType(""); setPage(1); }}
-            style={{ ...inputStyle, width: 180, cursor: "pointer" }}>
+            style={{ ...inputStyle, width: 190, cursor: "pointer" }}>
             <option value="">All Subjects</option>
+            <option value="__none__">⚠️ No subject (Unlinked)</option>
             {filteredSubjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
           {filterSubject && availableExamTypes.length > 0 && (
@@ -270,6 +271,35 @@ export function MCQBankPage() {
               <button onClick={() => setEditing(null)} style={{ color: "#94a3b8", fontSize: 18 }}>✕</button>
             </div>
             <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: "#94a3b8" }}>Subject</label>
+                  <select
+                    value={editing.subject}
+                    onChange={e => {
+                      const found = allSubjects.find(s => s.name === e.target.value);
+                      setEditing({
+                        ...editing,
+                        subject: e.target.value,
+                        sem: found ? found.sem : editing.sem,
+                      });
+                    }}
+                    style={{ ...inputStyle, cursor: "pointer" }}
+                  >
+                    <option value="">-- Unlinked / No Subject --</option>
+                    {allSubjects.map(s => <option key={s.id} value={s.name}>{s.name} (Sem {s.sem})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: "#94a3b8" }}>Semester</label>
+                  <input
+                    type="number"
+                    value={editing.sem}
+                    onChange={e => setEditing({ ...editing, sem: Number(e.target.value) })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: "#94a3b8" }}>Question</label>
                 <textarea rows={3} value={editing.question}

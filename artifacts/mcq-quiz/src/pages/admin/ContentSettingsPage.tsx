@@ -150,13 +150,15 @@ export function ContentSettingsPage() {
   }
 
   async function deleteSubject(id: number) {
-    if (!confirm("Are you sure you want to delete this subject?")) return;
+    const sub = subjects.find(s => s.id === id);
+    const subName = sub ? sub.name : `ID ${id}`;
+    if (!confirm(`Are you sure you want to delete "${subName}"?`)) return;
     setActing(`sub-del-${id}`);
     const r = await fetch(`${API}/admin/subjects/${id}`, { method: "DELETE" });
     if (!r.ok) {
       const data = await r.json().catch(() => ({}));
       if (data.questionCount) {
-        if (confirm(`${data.error}\n\nDo you want to permanently delete this subject and ALL its ${data.questionCount} question(s)?`)) {
+        if (confirm(`Warning: "${subName}" contains ${data.questionCount} question(s).\n\nDeleting this subject will leave ${data.questionCount} question(s) without a subject (unlinked) in the MCQ Bank.\n\nDo you want to proceed and leave these questions unlinked?`)) {
           const forceRes = await fetch(`${API}/admin/subjects/${id}?force=true`, { method: "DELETE" });
           if (!forceRes.ok) {
             const forceData = await forceRes.json().catch(() => ({}));

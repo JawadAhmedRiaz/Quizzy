@@ -215,26 +215,29 @@ router.delete("/admin/subjects/:id", adminMiddleware, async (req, res): Promise<
 
   if (qCount > 0 && !force) {
     res.status(400).json({
-      error: `Cannot delete subject "${subject.name}" because it contains ${qCount} question(s). Delete or reassign its questions first, or pass force=true to confirm permanent deletion.`,
+      error: `Cannot delete subject "${subject.name}" because it contains ${qCount} question(s). Deleting it will leave ${qCount} question(s) without a subject (unlinked). Pass force=true to confirm.`,
       questionCount: qCount,
+      subjectName: subject.name,
     });
     return;
   }
 
-  // If force=true, delete questions and subject together in a single transaction
+  // If force=true, unlink questions (subjectId = null) and delete the subject row
   await db.transaction(async (tx) => {
     if (qCount > 0) {
-      await tx.delete(questionsTable).where(
-        or(
-          eq(questionsTable.subjectId, id),
-          and(isNull(questionsTable.subjectId), eq(questionsTable.sem, subject.sem), eq(questionsTable.subject, subject.name))
-        )
-      );
+      await tx.update(questionsTable)
+        .set({ subjectId: null })
+        .where(
+          or(
+            eq(questionsTable.subjectId, id),
+            and(isNull(questionsTable.subjectId), eq(questionsTable.sem, subject.sem), eq(questionsTable.subject, subject.name))
+          )
+        );
     }
     await tx.delete(subjectsTable).where(eq(subjectsTable.id, id));
   });
 
-  res.json({ success: true, deletedQuestions: qCount });
+  res.json({ success: true, unlinkedQuestions: qCount });
 });
 
 // ─── MCQ Chunked Extraction Utilities ────────────────────────────────────────
@@ -546,7 +549,7 @@ router.post("/admin/extract-file", adminMiddleware, upload.single("file"), async
 // ─── Phase 3: Questions CRUD ──────────────────────────────────────────────
 
 router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> => {
-  const { q, sem, subject, examType, topic, page = "1", limit = "50" } = req.query as Record<string, string>;
+  const { q, sem, subject, examType, topic, unlinked, page = "1", limit = "50" } = req.query as Record<string, string>;
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50));
   const offset = (pageNum - 1) * limitNum;
@@ -554,7 +557,11 @@ router.get("/admin/questions", adminMiddleware, async (req, res): Promise<void> 
   const conditions = [];
   if (q) conditions.push(ilike(questionsTable.question, `%${q}%`));
   if (sem) conditions.push(eq(questionsTable.sem, parseInt(sem)));
-  if (subject) conditions.push(eq(questionsTable.subject, subject));
+  if (subject === "__none__" || unlinked === "true") {
+    conditions.push(isNull(questionsTable.subjectId));
+  } else if (subject) {
+    conditions.push(eq(questionsTable.subject, subject));
+  }
   if (examType) conditions.push(eq(questionsTable.examType, examType));
   if (topic) conditions.push(ilike(questionsTable.topic, `%${topic}%`));
 
